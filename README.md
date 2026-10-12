@@ -11,7 +11,7 @@ ShareMouse lets one keyboard and mouse work across macOS and Windows computers.
 
 ## Development and risk notice
 
-This is vibe-coded software: parts of the project were developed with AI-assisted coding. It is an early alpha and may contain defects, security issues, or behavior that has not been fully validated. Review the source and assess the risks before using it, especially in environments where input control, clipboard contents, or file transfer matter.
+This is vibe-coded software: parts of the project were developed with AI-assisted coding, with assistance from OpenAI Codex. It is an early alpha and may contain defects, security issues, or behavior that has not been fully validated. Review the source and assess the risks before using it, especially in environments where input control, clipboard contents, or file transfer matter.
 
 ## Current package
 
