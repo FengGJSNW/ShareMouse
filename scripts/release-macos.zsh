@@ -18,16 +18,7 @@ plist="$app_bundle/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build_number" "$plist"
 /usr/libexec/PlistBuddy -c "Set :ShareMouseDistributionVersion $release_version" "$plist" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c "Add :ShareMouseDistributionVersion string $release_version" "$plist"
-signing_identity=${SHAREMOUSE_SIGNING_IDENTITY:-}
-if [[ -z "$signing_identity" ]]; then
-  signing_identity=$(security find-identity -v -p codesigning | rg '"Developer ID Application:' | awk 'NR == 1 {print $2}' || true)
-fi
-if [[ -z "$signing_identity" ]]; then
-  signing_identity=$(security find-identity -v -p codesigning | rg '"Apple Development:' | awk 'NR == 1 {print $2}' || true)
-fi
-[[ -n "$signing_identity" ]] || signing_identity="-"
-codesign --force --sign "$signing_identity" "$app_bundle"
-codesign --verify --deep --strict "$app_bundle"
+print -r -- "Signing: skipped (unsigned release build)" > "$release_root/macos-signature.log"
 lipo "$app_bundle/Contents/MacOS/ShareMouse" -verify_arch arm64 x86_64
 for resource in tools.json bridge.py computer_client.py keyboard-layouts.json keyboard-icons.svg; do
   [[ -f "$app_bundle/Contents/Resources/$resource" ]]
@@ -40,5 +31,4 @@ cp "$task_root/packaging/INSTALLING.md" "$stage/INSTALLING.md"
 hdiutil create -ov -volname "ShareMouse $release_version" -srcfolder "$stage" \
   -format UDZO -imagekey zlib-level=9 "$release_root/ShareMouse-$release_version-macos-universal.dmg"
 hdiutil verify "$release_root/ShareMouse-$release_version-macos-universal.dmg"
-codesign -dv --verbose=2 "$app_bundle" 2> "$release_root/macos-signature.log"
 print -r -- "DMG: $release_root/ShareMouse-$release_version-macos-universal.dmg"
