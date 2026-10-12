@@ -1,0 +1,196 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="ShareMouse.MainWindow" Title="ShareMouse" Width="1080" Height="820" MinWidth="920" MinHeight="640" WindowStartupLocation="CenterScreen" Background="{DynamicResource CanvasBrush}" FontFamily="Segoe UI, Microsoft YaHei UI">
+
+    <DockPanel>
+        <Grid DockPanel.Dock="Bottom"><Grid.ColumnDefinitions><ColumnDefinition Width="192" /><ColumnDefinition /></Grid.ColumnDefinitions>
+            <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="20,12,20,18">
+                <ComboBox x:Name="AppearanceChoice" SelectionChanged="AppearanceChanged" ToolTip="界面外观" AutomationProperties.Name="界面外观"><ComboBoxItem Content="跟随系统" /><ComboBoxItem Content="亮色" /><ComboBoxItem Content="暗色" /></ComboBox>
+            </Border>
+            <DockPanel Grid.Column="1" Margin="28,12,28,14">
+                <Button DockPanel.Dock="Right" Content="打开日志" Click="OpenLogsClick" />
+                <TextBlock x:Name="BackgroundStatus" Text="关闭窗口后继续在系统托盘运行" FontSize="12" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+            </DockPanel>
+        </Grid>
+        <TabControl x:Name="MainNavigation" Style="{StaticResource Navigation}" SelectionChanged="NavigationChanged">
+            <TabItem Header="设备与连接" Tag="&#xE8EA;" ToolTip="连接你的设备，让协作自然发生。">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock x:Name="StartupError" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,0,0,18" />
+                        <GroupBox Header="本机信息">
+                            <StackPanel>
+                                <TextBlock x:Name="PeerName" FontSize="24" FontWeight="SemiBold" />
+                                <Expander Header="查看配对身份与公钥" Margin="0,8,0,0" IsExpanded="False">
+                                    <TextBox x:Name="LocalIdentityDetails" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" FontFamily="Consolas" Margin="0,8,0,0" />
+                                </Expander>
+                            </StackPanel>
+                        </GroupBox>
+                        <StackPanel Margin="0,0,0,18">
+                                <StackPanel Margin="0,0,0,8">
+                                    <GroupBox Header="本机配对信息">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70" />
+                                                    <ColumnDefinition Width="140" />
+                                                    <ColumnDefinition Width="50" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="配对码" VerticalAlignment="Center" />
+                                                <TextBox x:Name="LocalCode" Grid.Column="1" MaxLength="6" TextChanged="CredentialsTextChanged" />
+                                                <TextBlock Text="密钥" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                                <Grid Grid.Column="3"><PasswordBox x:Name="LocalPassword" PasswordChanged="CredentialsPasswordChanged" /><TextBox x:Name="RevealedPassword" Visibility="Collapsed" TextChanged="VisiblePasswordChanged" /></Grid>
+                                            </Grid>
+                                            <DockPanel Margin="0,12,0,0">
+
+                                                <CheckBox Content="显示密钥" Checked="RevealPasswordChanged" Unchecked="RevealPasswordChanged" VerticalAlignment="Center" />
+                                            </DockPanel>
+<StackPanel Orientation="Horizontal" Margin="0,12,0,0"><TextBlock Text="连接方式" VerticalAlignment="Center" Margin="0,0,16,0" />
+                            <CheckBox x:Name="NetworkAvailable" Content="Network" Margin="0,0,20,0" Checked="AvailabilityChanged" Unchecked="AvailabilityChanged" />
+                            <CheckBox x:Name="BluetoothAvailable" Content="Bluetooth" Checked="AvailabilityChanged" Unchecked="AvailabilityChanged" /><CheckBox x:Name="PairMcpEnabled" Content="MCPserver" Margin="20,0,0,0" Checked="PairMcpChanged" Unchecked="PairMcpChanged" />
+                        </StackPanel>
+                                            <TextBlock Text="密钥默认留空；配对信息实时自动更新。两种连接方式共用配对信息。" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,10,0,0"  TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </GroupBox>
+                                    <GroupBox Header="连接其他设备">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="对方配对码" Margin="0,0,0,6" />
+                                                    <TextBox x:Name="RemoteCode" MaxLength="6" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                                    <TextBlock Text="对方密钥（可选）" Margin="0,0,0,6" />
+                                                    <PasswordBox x:Name="RemotePassword" />
+                                                </StackPanel>
+                                                <Button x:Name="ConnectButton" Grid.Column="2" Content="连接" VerticalAlignment="Bottom" Click="ConnectClick" />
+                                            </Grid>
+                                            <TextBlock Text="可选：对方 IP；留空时按配对码查找附近设备" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,12,0,5" />
+                                            <TextBox x:Name="RemoteHost" />
+                                            <TextBlock x:Name="NetworkCount" Text="正在发现附近的网络端点" Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,0" TextWrapping="Wrap" />
+                                            <TextBlock x:Name="PairingStatus" Text="等待配对" Foreground="{DynamicResource TextBrush}" Margin="0,10,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </GroupBox>
+                                </StackPanel>
+                            <GroupBox Header="附近蓝牙设备" Visibility="Collapsed">
+                                <StackPanel Margin="22">
+                                    <TextBlock x:Name="BluetoothStatus" Text="蓝牙发现尚未启动" TextWrapping="Wrap" />
+                                    <Button Content="尝试发现 ShareMouse 蓝牙设备" Click="StartBluetoothClick" HorizontalAlignment="Left" Margin="0,14,0,14" />
+                                    <ScrollViewer Height="140" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="BluetoothCandidates" /></ScrollViewer>
+                                    <TextBlock x:Name="BluetoothCount" Text="发现 0 个蓝牙端点" />
+                                    <TextBlock Text="填写上方配对码和可选密钥，再选择蓝牙设备连接。取消勾选将停止对应方式的对外发现和新连接。" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                                </StackPanel>
+                            </GroupBox>
+                        </StackPanel>
+                        <GroupBox Header="已知设备">
+                            <StackPanel x:Name="KnownPeers" />
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="屏幕排布" Tag="&#xE7F4;" ToolTip="为每一块屏幕，找到合适的位置。">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ContentControl x:Name="ScreenLayoutHost" Margin="14" />
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="键盘与鼠标" Tag="&#xE765;" ToolTip="熟悉的操作，延伸到另一台电脑。">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,0,8">
+                        <GroupBox Header="鼠标共享"><StackPanel><TextBlock x:Name="MouseSharingStatus" Text="配对完成后自动共享键鼠" TextWrapping="Wrap" /><WrapPanel><Button Content="断开" Click="PauseInputClick" /><Button Content="重连" Click="ReconnectInputClick" /></WrapPanel><TextBlock Text="本机游戏鼠标" Margin="0,8,0,2" /><ComboBox x:Name="GameMouseChoice" SelectionChanged="GameMouseSelectionChanged"><ComboBoxItem Content="自动识别" /><ComboBoxItem Content="相对位移" /><ComboBoxItem Content="桌面坐标" /></ComboBox><TextBlock Text="游戏隐藏光标时使用相对位移。无法识别时在游戏所在电脑选择相对位移；此模式暂停边缘穿梭，原暂停快捷键可回本机。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" /><TextBlock Text="键鼠输入链路" Margin="0,8,0,2" /><ComboBox x:Name="InputLinkChoice" SelectionChanged="InputLinkSelectionChanged"><ComboBoxItem Content="蓝牙优先" /><ComboBoxItem Content="Wi-Fi 优先" /></ComboBox><TextBlock Text="所选链路为偏好；不可用时立即回退，延迟明显偏高时在操作间隙选择更快链路。文件和 MCP 优先网络。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" /><TextBlock Text="保留配对和文件连接。Ctrl+Alt+Shift+Esc 暂停／恢复键鼠共享，长按只切换一次；任意一端重连即可恢复共享。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" /></StackPanel></GroupBox>
+                        <GroupBox Header="键盘配置">
+                            <StackPanel>
+                                <Button Content="按键映射" Click="EditConfigClick" HorizontalAlignment="Left" />
+
+
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="剪贴板与传输" Tag="&#xE8B7;" ToolTip="文字与文件，在设备之间自由流动。">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,0,8">
+                        <GroupBox Header="共享剪贴板">
+                            <StackPanel>
+                                <TextBlock x:Name="ClipboardStatus" Text="等待复制 · 正文按粘贴请求" TextWrapping="Wrap" />
+                                <Button Content="加载到本机剪贴板" Click="LoadClipboardClick" HorizontalAlignment="Left" Margin="0,10,0,10" />
+                                <Button Content="历史与收藏…" Click="HistoryClick" HorizontalAlignment="Left" Margin="0,0,0,10" />
+                                <TextBlock Text="普通 Ctrl+V 使用最新共享项；文件粘贴到资源管理器当前目录。" Foreground="{DynamicResource MutedBrush}"  TextWrapping="Wrap" />
+                            </StackPanel>
+                        </GroupBox>
+                        <GroupBox Header="文件传输">
+                            <StackPanel>
+                                <Button Content="粘贴文件到目录…" Click="PasteFilesClick" HorizontalAlignment="Left" />
+                                <StackPanel x:Name="Transfers" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="设置" Tag="&#xE713;" ToolTip="按照你的习惯，调整 ShareMouse。">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,0,8">
+                        <GroupBox Header="权限"><Button Content="以管理员权限重启" Click="RestartElevatedClick" HorizontalAlignment="Left" /></GroupBox>
+                        <GroupBox Header="MCP / 远程 Computer Use">
+                            <StackPanel>
+                                <CheckBox x:Name="McpEnabledChoice" Content="启用本机 MCP 接口" Checked="MCPSettingsChanged" Unchecked="MCPSettingsChanged" />
+                                <CheckBox x:Name="ComputerUseChoice" Content="允许 AI / 已配对设备截图并操控本机" Checked="MCPSettingsChanged" Unchecked="MCPSettingsChanged" />
+                                <CheckBox x:Name="McpFilesChoice" Content="允许 MCP 复制文件与管理传输任务" Checked="MCPSettingsChanged" Unchecked="MCPSettingsChanged" />
+                                <CheckBox x:Name="CursorHintsChoice" Content="显示鼠标移动与点击反馈" Checked="MCPSettingsChanged" Unchecked="MCPSettingsChanged" />
+                                <TextBlock Text="显示平滑移动与点击反馈；连续移动与拖拽保持指定路径。" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="MCP 使用提示" Margin="0,8,0,0" />
+                                <ComboBox x:Name="MCPToastStyleChoice" Margin="0,6,0,0" SelectionChanged="MCPToastStyleChanged">
+                                    <ComboBoxItem Content="仅文字（透明背景）" Tag="text" />
+                                    <ComboBoxItem Content="隐藏" Tag="hidden" />
+                                </ComboBox>
+                                <TextBlock Text="隐藏只收起 MCP 提示；仍可在下方退出接管。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,6,0,0" />
+                                <TextBlock Text="截图返回给接入的 AI 客户端。误动键鼠不会结束接管，点击“退出接管”恢复本机控制。文件发送更新共享文件剪贴板，源文件保留。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,8" />
+                                <Button Content="复制 MCP 接入配置" Click="CopyMCPConfigurationClick" />
+                                <WrapPanel><TextBlock x:Name="MCPControlStatus" Text="MCP 未接管本机" VerticalAlignment="Center" /><Button x:Name="ExitMCPControlButton" Content="退出接管" Click="ExitMCPControlClick" IsEnabled="False" /></WrapPanel>
+                                <TextBlock x:Name="MCPStatus" Text="MCP 服务未启用" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </GroupBox>
+                        <GroupBox Header="外观"><DockPanel><TextBlock Text="界面主题" VerticalAlignment="Center" /><ComboBox Width="180" HorizontalAlignment="Right" SelectedIndex="{Binding SelectedIndex, ElementName=AppearanceChoice, Mode=TwoWay}"><ComboBoxItem Content="跟随系统" /><ComboBoxItem Content="亮色" /><ComboBoxItem Content="暗色" /></ComboBox></DockPanel></GroupBox>
+                        <GroupBox Header="本机设置">
+                            <StackPanel>
+                                <TextBlock Text="通知" />
+                                <ComboBox x:Name="NotificationRendererChoice" Margin="0,6,0,12">
+                                    <ComboBoxItem Content="自定义圆角提示" Tag="custom" />
+                                    <ComboBoxItem Content="系统原生通知" Tag="native" />
+                                </ComboBox>
+                                <TextBlock Text="自定义提示位置" />
+                                <ComboBox x:Name="ToastCornerChoice" Margin="0,6,0,12">
+                                    <ComboBoxItem Content="右下角" Tag="bottomRight" />
+                                    <ComboBoxItem Content="左下角" Tag="bottomLeft" />
+                                    <ComboBoxItem Content="右上角" Tag="topRight" />
+                                    <ComboBoxItem Content="左上角" Tag="topLeft" />
+                                </ComboBox>
+                                <CheckBox x:Name="LogEnabledChoice" Content="日志" Margin="0,0,0,6" Checked="LogEnabledChanged" Unchecked="LogEnabledChanged" />
+                                <TextBlock Text="关闭后停止记录日志，已有日志保留。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,8" />
+                                <TextBlock Text="日志等级" />
+                                <ComboBox x:Name="LogLevelChoice" Margin="0,6,0,12">
+                                    <ComboBoxItem Content="INFO" />
+                                    <ComboBoxItem Content="WARN" />
+                                    <ComboBoxItem Content="ERROR" />
+                                    <ComboBoxItem Content="DEBUG" />
+                                    <ComboBoxItem Content="TRACE" />
+                                </ComboBox>
+                                <CheckBox x:Name="StartupChoice" Content="登录后启动 ShareMouse" />
+                                <WrapPanel Margin="0,14,0,12">
+                                    <Button Content="保存设置" Click="SaveSettingsClick" />
+                                    <Button Content="测试通知" Click="TestNotificationClick" />
+                                    <Button Content="历史容量与快捷键…" Click="HistoryClick" />
+                                </WrapPanel>
+                                <TextBlock x:Name="SettingsStatus" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+                            </StackPanel>
+                        </GroupBox>
+                        <TextBlock Text="关闭主窗口后，系统托盘服务继续运行。退出 ShareMouse 才停止共享并释放按键。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

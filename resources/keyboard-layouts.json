@@ -1,0 +1,2056 @@
+{
+  "keys": [
+    {
+      "id": "KeyA",
+      "mac": "A",
+      "windows": "A",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyB",
+      "mac": "B",
+      "windows": "B",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyC",
+      "mac": "C",
+      "windows": "C",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyD",
+      "mac": "D",
+      "windows": "D",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyE",
+      "mac": "E",
+      "windows": "E",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyF",
+      "mac": "F",
+      "windows": "F",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyG",
+      "mac": "G",
+      "windows": "G",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyH",
+      "mac": "H",
+      "windows": "H",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyI",
+      "mac": "I",
+      "windows": "I",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyJ",
+      "mac": "J",
+      "windows": "J",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyK",
+      "mac": "K",
+      "windows": "K",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyL",
+      "mac": "L",
+      "windows": "L",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyM",
+      "mac": "M",
+      "windows": "M",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyN",
+      "mac": "N",
+      "windows": "N",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyO",
+      "mac": "O",
+      "windows": "O",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyP",
+      "mac": "P",
+      "windows": "P",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyQ",
+      "mac": "Q",
+      "windows": "Q",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyR",
+      "mac": "R",
+      "windows": "R",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyS",
+      "mac": "S",
+      "windows": "S",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyT",
+      "mac": "T",
+      "windows": "T",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyU",
+      "mac": "U",
+      "windows": "U",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyV",
+      "mac": "V",
+      "windows": "V",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyW",
+      "mac": "W",
+      "windows": "W",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyX",
+      "mac": "X",
+      "windows": "X",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyY",
+      "mac": "Y",
+      "windows": "Y",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "KeyZ",
+      "mac": "Z",
+      "windows": "Z",
+      "shift": "",
+      "side": "",
+      "category": "字母",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit0",
+      "mac": "0",
+      "windows": "0",
+      "shift": ")",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit1",
+      "mac": "1",
+      "windows": "1",
+      "shift": "!",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit2",
+      "mac": "2",
+      "windows": "2",
+      "shift": "@",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit3",
+      "mac": "3",
+      "windows": "3",
+      "shift": "#",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit4",
+      "mac": "4",
+      "windows": "4",
+      "shift": "$",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit5",
+      "mac": "5",
+      "windows": "5",
+      "shift": "%",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit6",
+      "mac": "6",
+      "windows": "6",
+      "shift": "^",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit7",
+      "mac": "7",
+      "windows": "7",
+      "shift": "&",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit8",
+      "mac": "8",
+      "windows": "8",
+      "shift": "*",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Digit9",
+      "mac": "9",
+      "windows": "9",
+      "shift": "(",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Backquote",
+      "mac": "`",
+      "windows": "`",
+      "shift": "~",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Minus",
+      "mac": "-",
+      "windows": "-",
+      "shift": "_",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Equal",
+      "mac": "=",
+      "windows": "=",
+      "shift": "+",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "BracketLeft",
+      "mac": "[",
+      "windows": "[",
+      "shift": "{",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "BracketRight",
+      "mac": "]",
+      "windows": "]",
+      "shift": "}",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Backslash",
+      "mac": "\\",
+      "windows": "\\",
+      "shift": "|",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Semicolon",
+      "mac": ";",
+      "windows": ";",
+      "shift": ":",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Quote",
+      "mac": "'",
+      "windows": "'",
+      "shift": "\"",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Comma",
+      "mac": ",",
+      "windows": ",",
+      "shift": "<",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Period",
+      "mac": ".",
+      "windows": ".",
+      "shift": ">",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Slash",
+      "mac": "/",
+      "windows": "/",
+      "shift": "?",
+      "side": "",
+      "category": "数字与符号",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "ControlLeft",
+      "mac": "Ctrl",
+      "windows": "Ctrl",
+      "shift": "",
+      "side": "L",
+      "category": "修饰键",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "ControlRight",
+      "mac": "Ctrl",
+      "windows": "Ctrl",
+      "shift": "",
+      "side": "R",
+      "category": "修饰键",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "MetaLeft",
+      "mac": "Command",
+      "windows": "Win",
+      "shift": "",
+      "side": "L",
+      "category": "修饰键",
+      "icon": "command",
+      "supported": true
+    },
+    {
+      "id": "MetaRight",
+      "mac": "Command",
+      "windows": "Win",
+      "shift": "",
+      "side": "R",
+      "category": "修饰键",
+      "icon": "command",
+      "supported": true
+    },
+    {
+      "id": "AltLeft",
+      "mac": "Option",
+      "windows": "Alt",
+      "shift": "",
+      "side": "L",
+      "category": "修饰键",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "AltRight",
+      "mac": "Option",
+      "windows": "Alt",
+      "shift": "",
+      "side": "R",
+      "category": "修饰键",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "ShiftLeft",
+      "mac": "Shift",
+      "windows": "Shift",
+      "shift": "",
+      "side": "L",
+      "category": "修饰键",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "ShiftRight",
+      "mac": "Shift",
+      "windows": "Shift",
+      "shift": "",
+      "side": "R",
+      "category": "修饰键",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Escape",
+      "mac": "Esc",
+      "windows": "Esc",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Tab",
+      "mac": "Tab",
+      "windows": "Tab",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "CapsLock",
+      "mac": "Caps",
+      "windows": "Caps",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Backspace",
+      "mac": "Backspace",
+      "windows": "Backspace",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "backspace",
+      "supported": true
+    },
+    {
+      "id": "Enter",
+      "mac": "Enter",
+      "windows": "Enter",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "enter",
+      "supported": true
+    },
+    {
+      "id": "Space",
+      "mac": "Space",
+      "windows": "Space",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Insert",
+      "mac": "Insert",
+      "windows": "Insert",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Delete",
+      "mac": "Delete",
+      "windows": "Delete",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "Delete",
+      "supported": true
+    },
+    {
+      "id": "Home",
+      "mac": "Home",
+      "windows": "Home",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "Home",
+      "supported": true
+    },
+    {
+      "id": "End",
+      "mac": "End",
+      "windows": "End",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "PageUp",
+      "mac": "PgUp",
+      "windows": "PgUp",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "PageUp",
+      "supported": true
+    },
+    {
+      "id": "PageDown",
+      "mac": "PgDn",
+      "windows": "PgDn",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "PageDown",
+      "supported": true
+    },
+    {
+      "id": "ArrowUp",
+      "mac": "ArrowUp",
+      "windows": "ArrowUp",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "ArrowUp",
+      "supported": true
+    },
+    {
+      "id": "ArrowDown",
+      "mac": "ArrowDown",
+      "windows": "ArrowDown",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "ArrowDown",
+      "supported": true
+    },
+    {
+      "id": "ArrowLeft",
+      "mac": "ArrowLeft",
+      "windows": "ArrowLeft",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "ArrowLeft",
+      "supported": true
+    },
+    {
+      "id": "ArrowRight",
+      "mac": "ArrowRight",
+      "windows": "ArrowRight",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": "ArrowRight",
+      "supported": true
+    },
+    {
+      "id": "PrintScreen",
+      "mac": "PrtSc",
+      "windows": "PrtSc",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "ContextMenu",
+      "mac": "Menu",
+      "windows": "Menu",
+      "shift": "",
+      "side": "",
+      "category": "导航与编辑",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F1",
+      "mac": "F1",
+      "windows": "F1",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F2",
+      "mac": "F2",
+      "windows": "F2",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F3",
+      "mac": "F3",
+      "windows": "F3",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F4",
+      "mac": "F4",
+      "windows": "F4",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F5",
+      "mac": "F5",
+      "windows": "F5",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F6",
+      "mac": "F6",
+      "windows": "F6",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F7",
+      "mac": "F7",
+      "windows": "F7",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F8",
+      "mac": "F8",
+      "windows": "F8",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F9",
+      "mac": "F9",
+      "windows": "F9",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F10",
+      "mac": "F10",
+      "windows": "F10",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F11",
+      "mac": "F11",
+      "windows": "F11",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "F12",
+      "mac": "F12",
+      "windows": "F12",
+      "shift": "",
+      "side": "",
+      "category": "F1-F12",
+      "icon": null,
+      "supported": true
+    },
+    {
+      "id": "Fn",
+      "mac": "Fn",
+      "windows": "Fn",
+      "shift": "",
+      "side": "",
+      "category": "特殊",
+      "icon": "globe",
+      "supported": false
+    },
+    {
+      "id": "NoAction",
+      "mac": "无动作",
+      "windows": "无动作",
+      "shift": "",
+      "side": "",
+      "category": "特殊",
+      "icon": null,
+      "supported": false
+    },
+    {
+      "id": "Power",
+      "mac": "Touch ID",
+      "windows": "Power",
+      "shift": "",
+      "side": "",
+      "category": "",
+      "icon": null,
+      "supported": false
+    }
+  ],
+  "layouts": {
+    "macos": [
+      {
+        "key": "Escape",
+        "x": 0,
+        "y": 0,
+        "w": 1.5,
+        "h": 1
+      },
+      {
+        "key": "F1",
+        "x": 1.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F2",
+        "x": 2.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F3",
+        "x": 3.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F4",
+        "x": 4.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F5",
+        "x": 5.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F6",
+        "x": 6.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F7",
+        "x": 7.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F8",
+        "x": 8.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F9",
+        "x": 9.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F10",
+        "x": 10.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F11",
+        "x": 11.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F12",
+        "x": 12.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Power",
+        "x": 13.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Backquote",
+        "x": 0,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit1",
+        "x": 1,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit2",
+        "x": 2,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit3",
+        "x": 3,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit4",
+        "x": 4,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit5",
+        "x": 5,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit6",
+        "x": 6,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit7",
+        "x": 7,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit8",
+        "x": 8,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit9",
+        "x": 9,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit0",
+        "x": 10,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Minus",
+        "x": 11,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Equal",
+        "x": 12,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Backspace",
+        "x": 13,
+        "y": 1.35,
+        "w": 1.5,
+        "h": 1
+      },
+      {
+        "key": "Tab",
+        "x": 0,
+        "y": 2.35,
+        "w": 1.5,
+        "h": 1
+      },
+      {
+        "key": "KeyQ",
+        "x": 1.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyW",
+        "x": 2.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyE",
+        "x": 3.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyR",
+        "x": 4.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyT",
+        "x": 5.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyY",
+        "x": 6.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyU",
+        "x": 7.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyI",
+        "x": 8.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyO",
+        "x": 9.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyP",
+        "x": 10.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "BracketLeft",
+        "x": 11.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "BracketRight",
+        "x": 12.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Backslash",
+        "x": 13.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "CapsLock",
+        "x": 0,
+        "y": 3.35,
+        "w": 1.75,
+        "h": 1
+      },
+      {
+        "key": "KeyA",
+        "x": 1.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyS",
+        "x": 2.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyD",
+        "x": 3.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyF",
+        "x": 4.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyG",
+        "x": 5.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyH",
+        "x": 6.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyJ",
+        "x": 7.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyK",
+        "x": 8.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyL",
+        "x": 9.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Semicolon",
+        "x": 10.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Quote",
+        "x": 11.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Enter",
+        "x": 12.75,
+        "y": 3.35,
+        "w": 1.75,
+        "h": 1
+      },
+      {
+        "key": "ShiftLeft",
+        "x": 0,
+        "y": 4.35,
+        "w": 2.25,
+        "h": 1
+      },
+      {
+        "key": "KeyZ",
+        "x": 2.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyX",
+        "x": 3.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyC",
+        "x": 4.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyV",
+        "x": 5.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyB",
+        "x": 6.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyN",
+        "x": 7.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyM",
+        "x": 8.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Comma",
+        "x": 9.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Period",
+        "x": 10.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Slash",
+        "x": 11.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ShiftRight",
+        "x": 12.25,
+        "y": 4.35,
+        "w": 2.25,
+        "h": 1
+      },
+      {
+        "key": "Fn",
+        "x": 0,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ControlLeft",
+        "x": 1,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "AltLeft",
+        "x": 2,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "MetaLeft",
+        "x": 3,
+        "y": 5.35,
+        "w": 1.25,
+        "h": 1
+      },
+      {
+        "key": "Space",
+        "x": 4.25,
+        "y": 5.35,
+        "w": 5,
+        "h": 1
+      },
+      {
+        "key": "MetaRight",
+        "x": 9.25,
+        "y": 5.35,
+        "w": 1.25,
+        "h": 1
+      },
+      {
+        "key": "AltRight",
+        "x": 10.5,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ArrowLeft",
+        "x": 11.5,
+        "y": 5.85,
+        "w": 1,
+        "h": 0.5
+      },
+      {
+        "key": "ArrowUp",
+        "x": 12.5,
+        "y": 5.35,
+        "w": 1,
+        "h": 0.5
+      },
+      {
+        "key": "ArrowDown",
+        "x": 12.5,
+        "y": 5.85,
+        "w": 1,
+        "h": 0.5
+      },
+      {
+        "key": "ArrowRight",
+        "x": 13.5,
+        "y": 5.85,
+        "w": 1,
+        "h": 0.5
+      }
+    ],
+    "windows": [
+      {
+        "key": "Escape",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F1",
+        "x": 1.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F2",
+        "x": 2.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F3",
+        "x": 3.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F4",
+        "x": 4.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F5",
+        "x": 5.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F6",
+        "x": 6.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F7",
+        "x": 7.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F8",
+        "x": 8.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F9",
+        "x": 9.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F10",
+        "x": 10.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F11",
+        "x": 11.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "F12",
+        "x": 12.5,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Backquote",
+        "x": 0,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit1",
+        "x": 1,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit2",
+        "x": 2,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit3",
+        "x": 3,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit4",
+        "x": 4,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit5",
+        "x": 5,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit6",
+        "x": 6,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit7",
+        "x": 7,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit8",
+        "x": 8,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit9",
+        "x": 9,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Digit0",
+        "x": 10,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Minus",
+        "x": 11,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Equal",
+        "x": 12,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Backspace",
+        "x": 13,
+        "y": 1.35,
+        "w": 2,
+        "h": 1
+      },
+      {
+        "key": "Tab",
+        "x": 0,
+        "y": 2.35,
+        "w": 1.5,
+        "h": 1
+      },
+      {
+        "key": "KeyQ",
+        "x": 1.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyW",
+        "x": 2.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyE",
+        "x": 3.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyR",
+        "x": 4.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyT",
+        "x": 5.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyY",
+        "x": 6.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyU",
+        "x": 7.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyI",
+        "x": 8.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyO",
+        "x": 9.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyP",
+        "x": 10.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "BracketLeft",
+        "x": 11.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "BracketRight",
+        "x": 12.5,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Backslash",
+        "x": 13.5,
+        "y": 2.35,
+        "w": 1.5,
+        "h": 1
+      },
+      {
+        "key": "CapsLock",
+        "x": 0,
+        "y": 3.35,
+        "w": 1.75,
+        "h": 1
+      },
+      {
+        "key": "KeyA",
+        "x": 1.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyS",
+        "x": 2.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyD",
+        "x": 3.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyF",
+        "x": 4.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyG",
+        "x": 5.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyH",
+        "x": 6.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyJ",
+        "x": 7.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyK",
+        "x": 8.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyL",
+        "x": 9.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Semicolon",
+        "x": 10.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Quote",
+        "x": 11.75,
+        "y": 3.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Enter",
+        "x": 12.75,
+        "y": 3.35,
+        "w": 2.25,
+        "h": 1
+      },
+      {
+        "key": "ShiftLeft",
+        "x": 0,
+        "y": 4.35,
+        "w": 2.25,
+        "h": 1
+      },
+      {
+        "key": "KeyZ",
+        "x": 2.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyX",
+        "x": 3.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyC",
+        "x": 4.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyV",
+        "x": 5.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyB",
+        "x": 6.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyN",
+        "x": 7.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "KeyM",
+        "x": 8.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Comma",
+        "x": 9.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Period",
+        "x": 10.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Slash",
+        "x": 11.25,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ShiftRight",
+        "x": 12.25,
+        "y": 4.35,
+        "w": 2.75,
+        "h": 1
+      },
+      {
+        "key": "ControlLeft",
+        "x": 0,
+        "y": 5.35,
+        "w": 1.25,
+        "h": 1
+      },
+      {
+        "key": "MetaLeft",
+        "x": 1.25,
+        "y": 5.35,
+        "w": 1.25,
+        "h": 1
+      },
+      {
+        "key": "AltLeft",
+        "x": 2.5,
+        "y": 5.35,
+        "w": 1.25,
+        "h": 1
+      },
+      {
+        "key": "Space",
+        "x": 3.75,
+        "y": 5.35,
+        "w": 6,
+        "h": 1
+      },
+      {
+        "key": "AltRight",
+        "x": 9.75,
+        "y": 5.35,
+        "w": 1.25,
+        "h": 1
+      },
+      {
+        "key": "Fn",
+        "x": 11.0,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ContextMenu",
+        "x": 12.0,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ControlRight",
+        "x": 13.0,
+        "y": 5.35,
+        "w": 1.5,
+        "h": 1
+      },
+      {
+        "key": "PrintScreen",
+        "x": 15.75,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Insert",
+        "x": 15.75,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Home",
+        "x": 16.75,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "PageUp",
+        "x": 17.75,
+        "y": 1.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "Delete",
+        "x": 15.75,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "End",
+        "x": 16.75,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "PageDown",
+        "x": 17.75,
+        "y": 2.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ArrowUp",
+        "x": 16.75,
+        "y": 4.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ArrowLeft",
+        "x": 15.75,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ArrowDown",
+        "x": 16.75,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      },
+      {
+        "key": "ArrowRight",
+        "x": 17.75,
+        "y": 5.35,
+        "w": 1,
+        "h": 1
+      }
+    ]
+  },
+  "icons": {
+    "command": "M7 7L17 7L17 17L7 17Z M7 7L3 7L3 3L7 3Z M17 7L21 7L21 3L17 3Z M7 17L3 17L3 21L7 21Z M17 17L21 17L21 21L17 21Z",
+    "windows": "M3 4L11 3L11 11L3 11Z M13 3L21 2L21 11L13 11Z M3 13L11 13L11 21L3 20Z M13 13L21 13L21 22L13 21Z",
+    "globe": "M3 12L21 12 M5 6L19 6 M5 18L19 18 M12 2L8 6L6 12L8 18L12 22L16 18L18 12L16 6Z M12 2L5 5L2 12L5 19L12 22L19 19L22 12L19 5Z",
+    "backspace": "M9 5L22 5L22 19L9 19L2 12Z M12 8L18 16 M18 8L12 16",
+    "enter": "M20 4L20 14L5 14 M10 9L5 14L10 19",
+    "ArrowUp": "M12 20L12 4 M5 11L12 4L19 11",
+    "ArrowDown": "M12 4L12 20 M5 13L12 20L19 13",
+    "ArrowLeft": "M20 12L4 12 M11 5L4 12L11 19",
+    "ArrowRight": "M4 12L20 12 M13 5L20 12L13 19",
+    "Home": "M3 11L12 3L21 11 M6 9L6 21L18 21L18 9 M10 21L10 14L14 14L14 21",
+    "PageUp": "M4 5L20 5 M12 21L12 9 M7 14L12 9L17 14",
+    "PageDown": "M4 19L20 19 M12 3L12 15 M7 10L12 15L17 10",
+    "Delete": "M5 6L19 6 M9 6L9 3L15 3L15 6 M7 6L8 21L16 21L17 6 M10 10L10 17 M14 10L14 17",
+    "sun": "M12 7L16 9L17 12L16 15L12 17L8 15L7 12L8 9Z M12 1L12 4 M12 20L12 23 M1 12L4 12 M20 12L23 12 M4 4L6 6 M18 18L20 20 M4 20L6 18 M18 6L20 4",
+    "search": "M10 3L16 6L17 11L14 16L8 17L3 13L3 7Z M16 16L22 22",
+    "mic": "M9 3L15 3L15 13L9 13Z M6 10L6 15L10 18L14 18L18 15L18 10 M12 18L12 22 M8 22L16 22",
+    "moon": "M16 2L11 8L12 14L18 18L22 16L18 22L10 22L3 15L3 7L9 2Z",
+    "prev": "M4 4L4 20 M20 4L8 12L20 20Z",
+    "play": "M5 4L16 12L5 20Z M19 4L19 20",
+    "next": "M20 4L20 20 M4 4L16 12L4 20Z",
+    "mute": "M3 9L8 9L13 4L13 20L8 15L3 15Z M17 8L22 16 M22 8L17 16",
+    "volume": "M3 9L8 9L13 4L13 20L8 15L3 15Z M17 7L20 10L20 14L17 17",
+    "overview": "M3 4L13 4L13 13L3 13Z M11 11L21 11L21 20L11 20Z"
+  }
+}

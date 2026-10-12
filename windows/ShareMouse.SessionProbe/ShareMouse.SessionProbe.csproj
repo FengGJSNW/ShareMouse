@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <WindowsSdkPackageVersion>10.0.22621.87</WindowsSdkPackageVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="..\ShareMouse\WindowsInputStatus.cs" Link="WindowsInputStatus.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="..\ShareMouse\WindowsInputPump.cs" Link="WindowsInputPump.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="..\ShareMouse\WindowsInputContext.cs" Link="WindowsInputContext.cs" /></ItemGroup>
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+    <Compile Include="..\ShareMouse\WindowsClipboardReader.cs" Link="WindowsClipboardReader.cs" />
+    <Compile Include="..\ShareMouse\ShareMouseDialog.cs" Link="ShareMouseDialog.cs" />
+    <Compile Include="..\ShareMouse\Theme.cs" Link="Theme.cs" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="..\ShareMouse.Network\ShareMouse.Network.csproj" /></ItemGroup>
+</Project>

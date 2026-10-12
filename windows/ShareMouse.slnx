@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="ShareMouse.Core/ShareMouse.Core.csproj" />
+  <Project Path="ShareMouse/ShareMouse.csproj" />
+  <Project Path="ShareMouse.Checks/ShareMouse.Checks.csproj" />
+  <Project Path="ShareMouse.Network/ShareMouse.Network.csproj" />
+  <Project Path="ShareMouse.SessionProbe/ShareMouse.SessionProbe.csproj" />
+</Solution>

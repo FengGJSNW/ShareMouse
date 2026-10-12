@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDevelopmentRegion</key><string>zh_CN</string>
+<key>CFBundleDisplayName</key><string>ShareMouse</string>
+<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+<key>CFBundleName</key><string>ShareMouse</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>0.1.0</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSMinimumSystemVersion</key><string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSBluetoothAlwaysUsageDescription</key><string>ShareMouse 使用蓝牙发现你允许协作的电脑，并在身份验证后传输加密键鼠、剪贴板和文件数据。蓝牙为可选功能。</string>
+<key>NSLocalNetworkUsageDescription</key><string>ShareMouse 使用局域网发现你允许协作的电脑，并在配对验证后建立加密连接，共享键鼠、剪贴板和文件。</string>
+<key>NSBonjourServices</key><array><string>_sharemouse._tcp</string></array>
+<key>NSAppleEventsUsageDescription</key><string>ShareMouse 请求与 Finder 协作，读取你选中的文件和当前粘贴目录，以执行跨电脑文件 Copy/Cut/Paste。此权限为可选功能。</string>
+</dict></plist>
