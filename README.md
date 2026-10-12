@@ -19,6 +19,23 @@ Version: v0.1.0-alpha.1.
 
 This is an early alpha preview. Hardware compatibility and some user workflows still need broader validation.
 
+## macOS: sign and install for local testing
+
+The macOS DMG is not notarized. These steps let you sign a local copy with your own Apple Development identity for local testing. This is not Developer ID signing or Apple notarization. The script does not ask for your Apple Account password, remove Gatekeeper quarantine, or grant macOS privacy permissions.
+
+1. **Download and install Xcode.** Get Xcode from the [Mac App Store](https://apps.apple.com/app/xcode/id497799835?mt=12), or choose a compatible version from [Apple Developer Downloads](https://developer.apple.com/download/). Open Xcode once after installation, accept the license, and install any components it requests.
+2. **Create your signing identity.** In Xcode, open **Settings > Accounts**, click **+**, and sign in with your Apple Account. Select an available Team, choose **Manage Certificates**, click **+**, and create an **Apple Development** certificate. Complete any two-factor authentication prompts. Keep the certificate's private key in your own Mac keychain; do not send anyone a .p12 export containing the private key.
+3. **Download the release files.** From the [v0.1.0-alpha.1 release](https://github.com/FengGJSNW/ShareMouse/releases/tag/v0.1.0-alpha.1), download both ShareMouse-v0.1.0-alpha.1-macos-universal.dmg and sign-install-macos.zsh. Save them in your Downloads folder and compare the DMG's SHA-256 with the value shown on the release page.
+4. **Run the signing installer.** Open Terminal from **Applications > Utilities**, then run:
+   ~~~sh
+   zsh "$HOME/Downloads/sign-install-macos.zsh" "$HOME/Downloads/ShareMouse-v0.1.0-alpha.1-macos-universal.dmg"
+   ~~~
+   If macOS asks whether codesign may access your signing key, allow access. The script verifies the app's bundle identifier and signature, installs it to ~/Applications/ShareMouse.app, and tries to launch it. It does not need sudo. If it reports that no valid Apple Development identity was found, return to step 2.
+5. **Review any first-launch warning.** Because this app is not notarized, macOS may show a security warning. Only if you verified the release source and accept the alpha risks, open **System Settings > Privacy & Security** and review the app-specific option to **Open Anyway**. Do not disable Gatekeeper globally. If macOS does not offer that option, stop and consult the [signing guide](https://github.com/FengGJSNW/ShareMouse/releases/download/v0.1.0-alpha.1/ShareMouse-macOS-signing-guide.md).
+6. **Grant the permissions you need.** In **System Settings > Privacy & Security > Accessibility** and **Input Monitoring**, add and enable ~/Applications/ShareMouse.app, then quit and reopen ShareMouse. Grant Bluetooth access if macOS asks when you use Bluetooth features. Signing does not grant these permissions, and a newly signed copy may need fresh approvals.
+
+You need a valid Apple Development identity for this workflow. The signing script itself uses macOS command-line tools, but creating the identity with the steps above uses Xcode. See Apple's [code-signing instructions](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/) and [notarization requirements](https://developer.apple.com/documentation/security/resolving-common-notarization-issues).
+
 ## Build macOS DMG
 
 Requires macOS 14 or newer and Xcode.
