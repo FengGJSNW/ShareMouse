@@ -9,6 +9,10 @@ ShareMouse lets one keyboard and mouse work across macOS and Windows computers.
 - Local network and optional Bluetooth connections.
 - An optional MCP interface for authorized computer use.
 
+## Development and risk notice
+
+This is vibe-coded software: parts of the project were developed with AI-assisted coding. It is an early alpha and may contain defects, security issues, or behavior that has not been fully validated. Review the source and assess the risks before using it, especially in environments where input control, clipboard contents, or file transfer matter.
+
 ## Current package
 
 Version: v0.1.0-alpha.1.
