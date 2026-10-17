@@ -32,22 +32,38 @@ public sealed class LanDiscovery : IDisposable
         LanCandidate[] candidates;
         lock (gate)
         {
-            foreach (var address in records.OfType<ARecord>()) addresses[address.Name.ToString()] = address.Address;
+            foreach (var address in records.OfType<ARecord>())
+                addresses[address.Name.ToString()] = address.Address;
             foreach (var service in records.OfType<SRVRecord>().Where(s => s.Name.ToString().Contains("._sharemouse._tcp.local")))
             {
-                if (service.Name == profile.FullyQualifiedName) continue;
-                if (service.TTL == TimeSpan.Zero) services.Remove(service.Name.ToString());
-                else services[service.Name.ToString()] = service;
-                if (!addresses.ContainsKey(service.Target.ToString())) discovery.Mdns.SendQuery(service.Target, type: DnsType.A);
+                if (service.Name == profile.FullyQualifiedName)
+                    continue;
+                if (service.TTL == TimeSpan.Zero)
+                    services.Remove(service.Name.ToString());
+                else
+                    services[service.Name.ToString()] = service;
+                if (!addresses.ContainsKey(service.Target.ToString()))
+                    discovery.Mdns.SendQuery(service.Target, type: DnsType.A);
             }
             candidates = services.Values.Where(s => addresses.ContainsKey(s.Target.ToString()))
                 .Select(s => new LanCandidate(s.Name.ToString(), addresses[s.Target.ToString()].ToString(), s.Port)).ToArray();
         }
         Changed?.Invoke(candidates);
     }
-    public void SetAvailable(bool enabled) {
-        if (enabled) { discovery.Advertise(profile); discovery.Announce(profile); }
-        else discovery.Unadvertise(profile);
+    public void SetAvailable(bool enabled)
+    {
+        if (enabled)
+        {
+            discovery.Advertise(profile);
+            discovery.Announce(profile);
+        }
+        else
+            discovery.Unadvertise(profile);
     }
-    public void Dispose() { refresh.Dispose(); discovery.Unadvertise(profile); discovery.Dispose(); }
+    public void Dispose()
+    {
+        refresh.Dispose();
+        discovery.Unadvertise(profile);
+        discovery.Dispose();
+    }
 }

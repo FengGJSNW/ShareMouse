@@ -5,7 +5,8 @@ public struct BLEMotionWindow {
     public init() {}
     public mutating func acknowledged(seconds: Double) {
         guard seconds.isFinite, seconds > 0 else { return }
-        roundTrips.append(seconds); if roundTrips.count > 32 { roundTrips.removeFirst() }
+        roundTrips.append(seconds);
+        if roundTrips.count > 32 { roundTrips.removeFirst() }
     }
     public func capacity(targetRate: Int) -> Int {
         let sorted = roundTrips.sorted()

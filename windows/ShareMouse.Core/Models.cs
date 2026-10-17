@@ -15,7 +15,10 @@ public readonly record struct SessionId(Guid Value)
     public static SessionId Create() => new(Guid.NewGuid());
 }
 
-public enum PeerPlatform { Windows, MacOS }
+public enum PeerPlatform
+{
+    Windows, MacOS
+}
 
 public enum Capability
 {

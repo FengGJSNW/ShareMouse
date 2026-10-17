@@ -1,5 +1,7 @@
 import XCTest
+
 @testable import ShareMouseCore
+
 final class BLERealtimeTests: XCTestCase {
     func testReorderedFragmentsAndAdaptiveWindow() throws {
         var sender = BLEStreamFraming(), receiver = BLEStreamFraming()
@@ -12,7 +14,7 @@ final class BLERealtimeTests: XCTestCase {
         XCTAssertEqual(restored, Data((0..<32).flatMap { Array(repeating: UInt8($0), count: 500) }))
         XCTAssertEqual(receiver.reordered, 16)
         XCTAssertTrue(try receiver.receive(packets[0]).isEmpty)
-        XCTAssertEqual(packets[0].prefix(12), Data([83,66,70,49,0,0,0,0,0,0,0,0]))
+        XCTAssertEqual(packets[0].prefix(12), Data([83, 66, 70, 49, 0, 0, 0, 0, 0, 0, 0, 0]))
         var window = BLEMotionWindow()
         for _ in 0..<16 { window.acknowledged(seconds: 0.045) }
         XCTAssertEqual(window.capacity(targetRate: 240), 13)

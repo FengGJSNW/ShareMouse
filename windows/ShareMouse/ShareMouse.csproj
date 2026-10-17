@@ -1,25 +1,28 @@
+<?xml version="1.0"?>
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
-    <WindowsSdkPackageVersion>10.0.22621.87</WindowsSdkPackageVersion>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <AssemblyName>ShareMouse</AssemblyName>
-    <Version>0.1.0-alpha.1</Version>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- WPF starts this app; WinForms is used only for tray/screen helpers.
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+        <UseWPF>true</UseWPF>
+        <UseWindowsForms>true</UseWindowsForms>
+        <WindowsSdkPackageVersion>10.0.22621.87</WindowsSdkPackageVersion>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>ShareMouse</AssemblyName>
+        <Version>0.1.0-alpha.2</Version>
+        <AssemblyVersion>0.1.0.0</AssemblyVersion>
+        <FileVersion>0.1.0.26</FileVersion>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <!-- WPF starts this app; WinForms is used only for tray/screen helpers.
          Keep the process DPI manifest instead of the WinForms startup API. -->
-    <NoWarn>$(NoWarn);WFO0003</NoWarn>
-  </PropertyGroup>
-  <ItemGroup>
-    <Content Include="..\..\resources\keyboard-layouts.json" Link="keyboard-layouts.json" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\resources\keyboard-icons.svg" Link="keyboard-icons.svg" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\mcp\bridge.py" Link="bridge.py" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\mcp\computer_client.py" Link="computer_client.py" CopyToOutputDirectory="PreserveNewest" />
-    <ProjectReference Include="..\ShareMouse.Core\ShareMouse.Core.csproj" />
-    <ProjectReference Include="..\ShareMouse.Network\ShareMouse.Network.csproj" />
-  </ItemGroup>
+        <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    </PropertyGroup>
+    <ItemGroup>
+        <Content Include="..\..\resources\keyboard-layouts.json" Link="keyboard-layouts.json" CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="..\..\resources\keyboard-icons.svg" Link="keyboard-icons.svg" CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="..\..\mcp\bridge.py" Link="bridge.py" CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="..\..\mcp\computer_client.py" Link="computer_client.py" CopyToOutputDirectory="PreserveNewest"/>
+        <ProjectReference Include="..\ShareMouse.Core\ShareMouse.Core.csproj"/>
+        <ProjectReference Include="..\ShareMouse.Network\ShareMouse.Network.csproj"/>
+    </ItemGroup>
 </Project>

@@ -23,7 +23,27 @@
 }
 ```
 
-Mac 脚本随应用包安装在 `Contents/Resources/bridge.py`；Windows 位于应用可执行文件旁。原生 HTTP 端点为 `http://127.0.0.1:49170/mcp`，只接受带本机 Bearer 令牌的请求。令牌文件限制为当前用户读取；不把令牌复制到远端、不开放局域网 HTTP 监听。远端调用复用已认证的 ShareMouse TLS 会话及分块通道。
+Mac 脚本随应用包安装在 `Contents/Resources/bridge.py`；本机签名安装脚本默认安装到 `~/Applications/ShareMouse.app`，不能继续照用旧的 `/Applications/ShareMouse.app` 路径。客户端 `args` 中使用当前安装位置的完整绝对路径，不依赖 `~` 或环境变量的 shell 展开。Windows 脚本位于当前应用可执行文件旁。在接入 AI 的电脑上移动或重装应用后，重新复制配置、替换客户端已有条目，并重新连接 MCP；不需要删除配对、清除身份或重装 Python。
+
+原生 HTTP 端点为 `http://127.0.0.1:49170/mcp`，只接受带本机 Bearer 令牌的请求。令牌文件限制为当前用户读取；不把令牌复制到远端、不开放局域网 HTTP 监听。远端调用复用已认证的 ShareMouse TLS 会话及分块通道。
+
+## 工具未出现或无法连接时
+
+ShareMouse 是本机安装的自定义 MCP 服务，不通过插件市场分发。排查客户端注册配置和进程，不把插件搜索结果或空的 resources 列表当作工具可用性的判断。
+
+| 现象 | 检查与处理 |
+| --- | --- |
+| 没有 `mcp__ShareMouse__*`，或调用时报工具不是函数 | 客户端尚未加载服务。先检查其 command/args 与当前软件复制的配置一致；脚本不存在时修正安装路径，再刷新 MCP 连接或重新打开会话 |
+| `can't open file ...bridge.py` / `No such file or directory` | 入口脚本路径失效；程序移动目录后旧配置不会自行迁移。这发生在连接服务之前，与远端控制权限无关 |
+| `connection refused`，或本机没有监听 49170 | 检查 ShareMouse 是否运行、是否启用本机 MCP 接口；不要只启动 Python 桥而关闭原生应用 |
+| 能列工具但看不到远端电脑 | 两端需建立已认证的 ShareMouse 连接；`local` 总是服务所在电脑，用 `list_computers` 的当前结果选择远端 |
+| 远端可见，但拒绝控制 | 用 `computer_use` 的 `status` 查看占用、锁屏和注入权限；不要抢占其他客户端或盲目重发输入 |
+| `needs_review:true` | 先查看返回的新图，再按新图定位；本次坐标输入可能尚未执行 |
+| `application_focus_denied` | 显式应用绑定的激活步骤失败。需要桌面操作时先用 `user_mouse` 且不传 application 重新观察，后续点击也不传 application |
+
+`codex mcp get ShareMouse --json` 可以核对 Codex 保存的启动配置，但列出配置不等于连接成功。应以新连接能列出六个默认工具、取得目标电脑画面，并观察到实际输入结果为准。DeepSeek Harness 的 stdio 条目同样必须引用现有脚本。修正配置后，已经打开的客户端可能仍需在 MCP 设置中刷新连接；不要为此终止其它 agent 的活跃接管。
+
+Codex 的 stdio `command` / `args` 配置字段见 [OpenAI 官方说明](https://learn.chatgpt.com/docs/extend/mcp#stdio-servers)。
 
 协议兼容 MCP 2026-07-28 的 `server/discover` / 请求元数据，以及 2025-11-25、2025-06-18、2025-03-26、2024-11-05 的 `initialize` 接入。现代请求的版本、方法和工具名 HTTP 头须与请求体一致；stdio 桥负责填入。服务只提供工具与 JSON 响应，没有资源、提示词或服务器发起的采样功能。参考 [MCP 官方规范](https://modelcontextprotocol.io/specification/2026-07-28)。
 
@@ -32,8 +52,10 @@ Mac 脚本随应用包安装在 `Contents/Resources/bridge.py`；Windows 位于�
 
 stdio 接入默认提供 6 个工具：`computer_use`、`list_computers` 和 4 个文件工具。电脑操作集中在 `computer_use`，会话 token／观察帧编号由客户端保存，截图作为 image content 返回，structuredContent 仅含状态。已有客户端需刷新 MCP 连接后加载新目录。
 
+以下坐标和文字仅演示参数，点击位置必须按本轮返回的画面替换。先使用不绑定应用的桌面模式：
+
 ```json
-{"computer":"windows","application":"微信","action":"observe"}
+{"computer":"windows","control_mode":"user_mouse","action":"observe"}
 {"action":"click","x":420,"y":310}
 {"action":"type","text":"Hello"}
 {"action":"keypress","keys":["ENTER"]}
@@ -41,7 +63,9 @@ stdio 接入默认提供 6 个工具：`computer_use`、`list_computers` 和 4 �
 {"action":"release"}
 ```
 
-`computer` 可用设备名／ID、`local`、`windows`、`mac`；后续省略表示继续同一电脑。`application` 绑定正在运行的应用，前台改变时尝试恢复；窗口身份或位置变化后先返回 `needs_review` 新画面，不用旧坐标直接点击。`target` 精确匹配可交互控件名称，缺少控件时尝试 OCR；多个不同目标或无匹配返回选择／截图，不猜测。`inspect:true` 才展开 OCR／控件详情。`action:batch` 可传原动作数组，客户端自动接入最新帧。
+`computer` 可用设备名／ID、`local`、`windows`、`mac`；后续省略表示继续同一电脑。桌面模式不传 `application`，可点击其它可见窗口使其聚焦。显式 `control_mode:user_mouse` 且省略 `application` 会解除旧应用绑定；也可用 `application:""` 明确解除。
+
+只有希望固定操作某个应用时才传非空 `application`。它是绑定命令，不是点击目标的备注；前台改变时会尝试恢复该应用。后续同时省略模式和应用则沿用当前绑定。窗口身份或位置变化后先返回 `needs_review` 新画面，不用旧坐标直接点击。`target` 精确匹配可交互控件名称，缺少控件时尝试 OCR；多个不同目标或无匹配返回选择／截图，不猜测。`inspect:true` 才展开 OCR／控件详情。`action:batch` 可传原动作数组，客户端自动接入最新帧。
 
 客户端 30 秒闲置和正常断开会释放自己的控制；目标端短租约 45 秒覆盖客户端崩溃，正在执行的有界动作预留 60 秒。恢复后的坐标动作先返回新画面供审查，按名称定位则可在新帧重新解析。观察帧不匹配返回可审查画面，部分或未知输入不自动重发；用户退出后须用户再次授权才允许 `resume_authorized:true`。占用时返回持有 peer、客户端名称、剩余租期，不夺取别人的控制。旧 token 接口仍保持原有租期和保护；追加 `--advanced-tools` 可同时展示。原生 HTTP 接口仍兼容旧工具。
 
@@ -180,13 +204,13 @@ Windows 游戏／管理员窗口：`get_computer_info` 和观察结果的 `input
 日常操作使用默认 stdio 工具 `computer_use`。会话和观察帧由客户端保存；`structuredContent.result` 是不含令牌和图片字节的状态，图像单独返回为 MCP image content。默认图像为 JPEG（质量 80），不再自动限制到最长边 1600；PNG 保留为可选的无损格式。
 
 ```json
-{"computer":"FENG-GJSNW","action":"observe","text_only":true}
+{"computer":"Windows-PC","action":"observe","text_only":true}
 ```
 
 `text_only` 读取当前前台窗口的原生 AX/UI Automation 树，返回 role、name、value/text、node_id、parent_id、depth 和 bounds，以及 `text_status`、截断标记。它不切换应用、不获取或续期控制会话、不改变已拥有的观察帧，且 `pixels_captured:false`。密码字段值会隐藏。它适合普通界面；游戏、自绘界面、浏览器不提供的语义不能通过 OCR 伪造为控件。纯文本模式目前仅用于 observe，不能同时指定 application 或 region。
 
 ```json
-{"computer":"FENG-GJSNW","application":"ShareMouse Pointer QA","action":"observe","image_format":"jpeg","jpeg_quality":75,"max_dimension":1600,"inspect":true}
+{"computer":"Windows-PC","application":"ShareMouse Pointer QA","action":"observe","image_format":"jpeg","jpeg_quality":75,"max_dimension":1600,"inspect":true}
 {"action":"observe","region":{"x":700,"y":430,"width":200,"height":150},"image_format":"png"}
 {"action":"click","x":100,"y":75}
 ```
@@ -216,7 +240,7 @@ bridge.py 的普通请求超时 75 秒，release_input 为 6 秒：清理时不�
 默认 stdio 仍只展示六个工具，桌面操作使用 `computer_use`；高级接口使用 `--advanced-tools`。Codex 和本机 DeepSeek Harness 已指向正式安装的 bridge，现代 MCP 调用结果包含 `resultType:complete`。默认入口自动保存自己的会话和观察帧，闲置释放，重连先返回新画面；不会夺取其它客户端的有效控制。
 
 ```json
-{"computer":"FENG-GJSNW","application":"msedge","control_mode":"user_mouse","action":"observe"}
+{"computer":"Windows-PC","application":"msedge","control_mode":"user_mouse","action":"observe"}
 {"action":"batch","actions":[{"type":"keypress","keys":["Ctrl","l"]},{"type":"type","text":"https://chatgpt.com/"},{"type":"keypress","keys":["Enter"]},{"type":"wait","milliseconds":1500}]}
 {"action":"release"}
 ```

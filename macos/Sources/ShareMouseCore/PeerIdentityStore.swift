@@ -7,11 +7,8 @@ public struct PeerIdentityStore {
     public func loadOrCreate() throws -> PeerID {
         let file = directory.appendingPathComponent("peer-id")
         if FileManager.default.fileExists(atPath: file.path) {
-            let text = try String(contentsOf: file, encoding: .utf8)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let uuid = UUID(uuidString: text) else {
-                throw IdentityError.invalidStoredIdentity
-            }
+            let text = try String(contentsOf: file, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let uuid = UUID(uuidString: text) else { throw IdentityError.invalidStoredIdentity }
             return PeerID(uuid)
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -20,7 +17,5 @@ public struct PeerIdentityStore {
         return id
     }
 
-    public enum IdentityError: Error {
-        case invalidStoredIdentity
-    }
+    public enum IdentityError: Error { case invalidStoredIdentity }
 }

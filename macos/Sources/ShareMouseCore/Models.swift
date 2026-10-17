@@ -15,9 +15,7 @@ public struct SessionID: Equatable, Sendable {
     public init(_ value: UUID = UUID()) { self.value = value }
 }
 
-public enum PeerPlatform: String, Codable, Sendable {
-    case windows, macOS
-}
+public enum PeerPlatform: String, Codable, Sendable { case windows, macOS }
 
 public enum Capability: String, Codable, Sendable {
     case keyboard, pointer, scroll, textClipboard, fileTransfer

@@ -1,19 +1,20 @@
 param(
- [string]$ReleaseVersion='v0.1.0-alpha.1',
- [int]$BuildNumber=1,
+ [string]$ReleaseVersion='v0.1.0-alpha.2',
+ [int]$BuildNumber=26,
  [Parameter(Mandatory=$true)][string]$ISCC
 )
 $ErrorActionPreference='Stop'
-if($ReleaseVersion -notmatch '^v?\d+\.\d+\.\d+-alpha\.\d+$' -or $BuildNumber -lt 1 -or $BuildNumber -gt 65535){throw 'Invalid release version/build'}
+if($ReleaseVersion -notmatch '^v?\d+\.\d+\.\d+-(alpha|beta|rc)\.\d+$' -or $BuildNumber -lt 1 -or $BuildNumber -gt 65535){throw 'Invalid release version/build'}
 $root=Split-Path $PSScriptRoot -Parent
 $release=Join-Path $root ('artifacts\releases\'+$ReleaseVersion)
 $publish=Join-Path $release 'windows-x64'
-$packageVersion=$ReleaseVersion.TrimStart('v')
-$baseVersion=$packageVersion.Split('-')[0]
+$productVersion=$ReleaseVersion.TrimStart('v')
+$baseVersion=$productVersion.Split('-')[0]
 $numeric=$baseVersion+'.'+$BuildNumber
-$assemblyVersion=$baseVersion+'.0'
+$assembly=$baseVersion+'.0'
+$env:DOTNET_PROCESSOR_COUNT='2'
 New-Item -ItemType Directory -Path $release -Force|Out-Null
-dotnet publish (Join-Path $root 'windows\ShareMouse\ShareMouse.csproj') -c Release -r win-x64 --self-contained true --artifacts-path (Join-Path $release 'dotnet-build') --disable-build-servers -o $publish -p:Version=$packageVersion -p:AssemblyVersion=$assemblyVersion -p:FileVersion=$numeric -p:PublishSingleFile=false -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false
+dotnet publish (Join-Path $root 'windows\ShareMouse\ShareMouse.csproj') -c Release -r win-x64 --self-contained true --artifacts-path (Join-Path $release 'dotnet-build') --disable-build-servers -m:1 -o $publish -p:Version=$productVersion -p:AssemblyVersion=$assembly -p:IncludeSourceRevisionInInformationalVersion=false -p:FileVersion=$numeric -p:PublishSingleFile=false -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false
 if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
 foreach($name in @('ShareMouse.exe','ShareMouse.dll','ShareMouse.Core.dll','ShareMouse.Network.dll','hostfxr.dll','coreclr.dll','msquic.dll','bridge.py','computer_client.py','keyboard-layouts.json','keyboard-icons.svg')) {
  if(-not(Test-Path -LiteralPath (Join-Path $publish $name))){throw ('Missing release payload: '+$name)}

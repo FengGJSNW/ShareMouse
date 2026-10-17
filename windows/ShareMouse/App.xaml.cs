@@ -23,24 +23,50 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        if(e.Args.Length==1 && e.Args[0]==WindowsClipboardReader.HelperArgument) {Shutdown(WindowsClipboardReader.RunHelper(WindowsClipboardAdapter.ReadSnapshot));return;}
-        // The executable manifest requests UAC before startup. Also guard DLL-hosted launches.
-        if(!WindowsInputStatus.IsElevated) {
-            try {
-                var launch=new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory,"ShareMouse.exe")) {UseShellExecute=true,Verb="runas",WorkingDirectory=AppContext.BaseDirectory};
-                foreach(var argument in e.Args)launch.ArgumentList.Add(argument);
-                Process.Start(launch);
-            } catch(System.ComponentModel.Win32Exception) { } // Cancelled consent never silently starts a medium-integrity instance.
-            Shutdown();return;
+        if (e.Args.Length == 1 && e.Args[0] == WindowsClipboardReader.HelperArgument)
+        {
+            Shutdown(WindowsClipboardReader.RunHelper(WindowsClipboardAdapter.ReadSnapshot));
+            return;
         }
-        if(e.Args.Length==2&&e.Args[0]=="--mcp-inspect"){_=InspectAndExit(e.Args[1]);return;}
-        var restart=e.Args.FirstOrDefault(a=>a.StartsWith("--restart-after=",StringComparison.Ordinal));
-        if(restart is not null && int.TryParse(restart.Substring("--restart-after=".Length),out var previousId) && previousId!=Environment.ProcessId) {
-            try { using var previous=Process.GetProcessById(previousId);if(!previous.WaitForExit(10000)){Shutdown();return;} }
-            catch(ArgumentException) { } // The previous instance has already exited.
+        // The executable manifest requests UAC before startup. Also guard DLL-hosted launches.
+        if (!WindowsInputStatus.IsElevated)
+        {
+            try
+            {
+                var launch = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "ShareMouse.exe")) { UseShellExecute = true, Verb = "runas", WorkingDirectory = AppContext.BaseDirectory };
+                foreach (var argument in e.Args)
+                    launch.ArgumentList.Add(argument);
+                Process.Start(launch);
+            }
+            catch (System.ComponentModel.Win32Exception) { } // Cancelled consent never silently starts a medium-integrity instance.
+            Shutdown();
+            return;
+        }
+        if (e.Args.Length == 2 && e.Args[0] == "--mcp-inspect")
+        {
+            _ = InspectAndExit(e.Args[1]);
+            return;
+        }
+        var restart = e.Args.FirstOrDefault(a => a.StartsWith("--restart-after=", StringComparison.Ordinal));
+        if (restart is not null && int.TryParse(restart.Substring("--restart-after=".Length), out var previousId) && previousId != Environment.ProcessId)
+        {
+            try
+            {
+                using var previous = Process.GetProcessById(previousId);
+                if (!previous.WaitForExit(10000))
+                {
+                    Shutdown();
+                    return;
+                }
+            }
+            catch (ArgumentException) { } // The previous instance has already exited.
         }
         instance = new Mutex(true, "Local\\ShareMouse.Desktop", out ownsInstance);
-        if (!ownsInstance) { Shutdown(); return; }
+        if (!ownsInstance)
+        {
+            Shutdown();
+            return;
+        }
 
         Peer? peer = null;
         string? error = null;
@@ -62,9 +88,11 @@ public partial class App : Application
         MainWindow = new MainWindow(peer, error, OpenLogs, Record);
         if (peer is not null && error is null)
         {
-            try {
+            try
+            {
                 pairing = new PairingController((MainWindow)MainWindow, peer, dataDirectory, Record, preferences);
-                if (Array.IndexOf(e.Args, "--bluetooth-discovery") >= 0) pairing.StartBluetooth();
+                if (Array.IndexOf(e.Args, "--bluetooth-discovery") >= 0)
+                    pairing.StartBluetooth();
             }
             catch { ((MainWindow)MainWindow).ShowPairingStatus("无法启动配对服务，请检查端口、身份密钥或网络权限"); Record(LogLevel.Error, "SessionStartupFailed"); }
         }
@@ -73,14 +101,25 @@ public partial class App : Application
         menu.Items.Add("打开日志目录", null, (_, _) => OpenLogs());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出 ShareMouse", null, (_, _) => Shutdown());
-        tray = new Forms.NotifyIcon {
-            Icon = System.Drawing.SystemIcons.Application, Text = "ShareMouse", Visible = true, ContextMenuStrip = menu
+        tray = new Forms.NotifyIcon
+        {
+            Icon = System.Drawing.SystemIcons.Application,
+            Text = "ShareMouse",
+            Visible = true,
+            ContextMenuStrip = menu
         };
         tray.DoubleClick += (_, _) => ShowMainWindow();
         ShowMainWindow();
     }
 
-    private async System.Threading.Tasks.Task InspectAndExit(string request){try{await WindowsMCPInspection.Run(request);}finally{Shutdown();}}
+    private async System.Threading.Tasks.Task InspectAndExit(string request)
+    {
+        try
+        {
+            await WindowsMCPInspection.Run(request);
+        }
+        finally { Shutdown(); }
+    }
 
 
     private void ShowMainWindow()
@@ -91,17 +130,30 @@ public partial class App : Application
         Record(LogLevel.Info, $"WindowShown visible={MainWindow.IsVisible} desktopSession={Process.GetCurrentProcess().SessionId} nativeWindow={new WindowInteropHelper(MainWindow).Handle}");
     }
 
-    private void OpenLogs() {
-        try { var directory=Path.Combine(dataDirectory,"logs");Directory.CreateDirectory(directory);Process.Start(new ProcessStartInfo(directory){UseShellExecute=true}); }
-        catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception){MessageBox.Show("无法打开日志目录，请检查本机数据目录的权限。","ShareMouse");}
+    private void OpenLogs()
+    {
+        try
+        {
+            var directory = Path.Combine(dataDirectory, "logs");
+            Directory.CreateDirectory(directory);
+            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { MessageBox.Show("无法打开日志目录，请检查本机数据目录的权限。", "ShareMouse"); }
     }
 
     private void Record(LogLevel level, string eventMetadata)
     {
-        if(preferences?.Accepts(level)!=true)return;
-        try { logger ??= new AppLogger(Path.Combine(dataDirectory,"logs"));logger.Write(level,eventMetadata); }
+        if (preferences?.Accepts(level) != true)
+            return;
+        try
+        {
+            logger ??= new AppLogger(Path.Combine(dataDirectory, "logs"));
+            logger.Write(level, eventMetadata);
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { Debug.WriteLine("ShareMouse: unable to write lifecycle log."); }
+        {
+            Debug.WriteLine("ShareMouse: unable to write lifecycle log.");
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -110,7 +162,8 @@ public partial class App : Application
         Record(LogLevel.Info, "ApplicationStopped");
         tray?.Dispose();
         logger?.Dispose();
-        if (ownsInstance) instance?.ReleaseMutex();
+        if (ownsInstance)
+            instance?.ReleaseMutex();
         instance?.Dispose();
         base.OnExit(e);
     }

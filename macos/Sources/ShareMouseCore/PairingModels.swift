@@ -3,7 +3,10 @@ import Foundation
 public struct CertificatePeer: Sendable, Equatable {
     public let peerID: String
     public let publicKey: String
-    public init(peerID: String, publicKey: String) { self.peerID = peerID; self.publicKey = publicKey }
+    public init(peerID: String, publicKey: String) {
+        self.peerID = peerID;
+        self.publicKey = publicKey
+    }
 }
 
 public enum TrustState: String, Codable, Sendable { case known, trusted }
@@ -24,7 +27,8 @@ public final class PeerRegistry: @unchecked Sendable {
 
     public init(directory: URL) throws {
         file = directory.appendingPathComponent("known-peers.json")
-        peers = FileManager.default.fileExists(atPath: file.path)
+        peers =
+            FileManager.default.fileExists(atPath: file.path)
             ? try JSONDecoder().decode([KnownPeer].self, from: Data(contentsOf: file)) : []
     }
 
@@ -37,8 +41,10 @@ public final class PeerRegistry: @unchecked Sendable {
                 guard peers[index].publicKey == certificate.publicKey else { throw PairingError.identityChanged }
                 peers[index].name = String(name.prefix(128))
             } else {
-                peers.append(KnownPeer(peerID: certificate.peerID, name: String(name.prefix(128)),
-                                       publicKey: certificate.publicKey, trust: .known, autoConnect: false))
+                peers.append(
+                    KnownPeer(
+                        peerID: certificate.peerID, name: String(name.prefix(128)), publicKey: certificate.publicKey,
+                        trust: .known, autoConnect: false))
             }
             try save()
         }
@@ -54,7 +60,10 @@ public final class PeerRegistry: @unchecked Sendable {
     }
 
     public func remove(_ id: String) throws {
-        try lock.withLock { peers.removeAll { $0.peerID == id }; try save() }
+        try lock.withLock {
+            peers.removeAll { $0.peerID == id };
+            try save()
+        }
     }
 
     public func rememberNetworkEndpoint(_ id: String, endpoint: NetworkEndpoint) throws {
@@ -64,7 +73,8 @@ public final class PeerRegistry: @unchecked Sendable {
             let previous = peers[index].networkEndpoints ?? []
             let next = Array(([endpoint] + previous.filter { $0 != endpoint }).prefix(8))
             guard next != previous else { return }
-            peers[index].networkEndpoints = next; try save()
+            peers[index].networkEndpoints = next;
+            try save()
         }
     }
 
@@ -74,7 +84,9 @@ public final class PeerRegistry: @unchecked Sendable {
     }
 }
 
-public enum PairingError: Error { case identityChanged, invalidMessage, authenticationFailed, disconnected, incompatibleVersion, timedOut }
+public enum PairingError: Error {
+    case identityChanged, invalidMessage, authenticationFailed, disconnected, incompatibleVersion, timedOut
+}
 
 // JSON inside TLS only; 4-byte network-order frame length, maximum 64 KiB.
 public struct SessionMessage: Codable, Sendable {
@@ -99,7 +111,10 @@ public struct SessionMessage: Codable, Sendable {
     public var deliveryID: String?
     public var payload: Data?
 
-    public init(type: String, sourcePeerID: String) { self.type = type; self.sourcePeerID = sourcePeerID }
+    public init(type: String, sourcePeerID: String) {
+        self.type = type;
+        self.sourcePeerID = sourcePeerID
+    }
 }
 
 public struct SessionInfo: Sendable {

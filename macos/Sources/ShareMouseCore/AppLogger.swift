@@ -1,8 +1,6 @@
 import Foundation
 
-public enum LogLevel: String {
-    case trace = "TRACE", debug = "DEBUG", info = "INFO", warn = "WARN", error = "ERROR"
-}
+public enum LogLevel: String { case trace = "TRACE", debug = "DEBUG", info = "INFO", warn = "WARN", error = "ERROR" }
 
 // Only lifecycle metadata belongs here. Never pass passwords, keys or clipboard/file content.
 public final class AppLogger {

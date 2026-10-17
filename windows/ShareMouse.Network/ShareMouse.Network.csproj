@@ -1,13 +1,14 @@
+<?xml version="1.0"?>
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <WindowsSdkPackageVersion>10.0.22621.87</WindowsSdkPackageVersion>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="..\..\mcp\tools.json" LogicalName="ShareMouse.MCP.Tools" />
-    <ProjectReference Include="..\ShareMouse.Core\ShareMouse.Core.csproj" />
-    <PackageReference Include="Makaretu.Dns.Multicast" Version="0.27.0" />
-  </ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+        <WindowsSdkPackageVersion>10.0.22621.87</WindowsSdkPackageVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <EmbeddedResource Include="..\..\mcp\tools.json" LogicalName="ShareMouse.MCP.Tools"/>
+        <ProjectReference Include="..\ShareMouse.Core\ShareMouse.Core.csproj"/>
+        <PackageReference Include="Makaretu.Dns.Multicast" Version="0.27.0"/>
+    </ItemGroup>
 </Project>

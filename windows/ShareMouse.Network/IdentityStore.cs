@@ -6,8 +6,14 @@ namespace ShareMouse.Network;
 
 public sealed class IdentityStore : IDisposable
 {
-    public X509Certificate2 Certificate { get; }
-    public CertificatePeer Identity { get; }
+    public X509Certificate2 Certificate
+    {
+        get;
+    }
+    public CertificatePeer Identity
+    {
+        get;
+    }
 
     public IdentityStore(string peerId)
     {
@@ -17,14 +23,16 @@ public sealed class IdentityStore : IDisposable
         var existing = store.Certificates.Cast<X509Certificate2>().FirstOrDefault(c => c.Subject == subject);
         if (existing is not null)
         {
-            if (!existing.HasPrivateKey) throw new CryptographicException("Stored identity has no private key; preserved.");
+            if (!existing.HasPrivateKey)
+                throw new CryptographicException("Stored identity has no private key; preserved.");
             Certificate = existing;
         }
         else
         {
             var keyName = "ShareMouse-" + peerId;
             using var key = CngKey.Exists(keyName) ? CngKey.Open(keyName) : CngKey.Create(CngAlgorithm.Rsa, keyName,
-                new CngKeyCreationParameters {
+                new CngKeyCreationParameters
+                {
                     Provider = CngProvider.MicrosoftSoftwareKeyStorageProvider,
                     ExportPolicy = CngExportPolicies.None,
                     KeyUsage = CngKeyUsages.Signing | CngKeyUsages.Decryption,
@@ -41,7 +49,8 @@ public sealed class IdentityStore : IDisposable
             Certificate = store.Certificates.Cast<X509Certificate2>().First(c => c.Subject == subject && c.HasPrivateKey);
         }
         Identity = Describe(Certificate);
-        if (Identity.PeerID != peerId) throw new CryptographicException("Identity mismatch.");
+        if (Identity.PeerID != peerId)
+            throw new CryptographicException("Identity mismatch.");
     }
 
     public static CertificatePeer Describe(X509Certificate2 certificate)
@@ -51,7 +60,8 @@ public sealed class IdentityStore : IDisposable
             throw new CryptographicException("Invalid peer certificate.");
         using var rsa = certificate.GetRSAPublicKey() ?? throw new CryptographicException("Unsupported identity key.");
         if (rsa.KeySize < 2048 || DateTime.UtcNow < certificate.NotBefore.ToUniversalTime()
-            || DateTime.UtcNow > certificate.NotAfter.ToUniversalTime()) throw new CryptographicException("Invalid peer certificate.");
+            || DateTime.UtcNow > certificate.NotAfter.ToUniversalTime())
+            throw new CryptographicException("Invalid peer certificate.");
         return new(id.ToString("D"), Convert.ToBase64String(rsa.ExportRSAPublicKey()));
     }
     public void Dispose() => Certificate.Dispose();

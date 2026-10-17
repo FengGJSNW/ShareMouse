@@ -23,6 +23,10 @@ public struct InputPacket: Codable, Sendable {
     public var scrollPhase: Int?
     public var momentumPhase: Int?
     public var preciseScroll: Bool?
+    public var fnEnabled: Bool?
+    public var functionKeysEnabled: Bool?
+    public var functionSlot: String?
+    public var functionSlots: [String: String]?
     public var sourcePlatform: String?
     public var button: Int = 0
     public var deltaX: Double = 0
@@ -31,7 +35,10 @@ public struct InputPacket: Codable, Sendable {
     public var buttons: [Int]?
     public var priority: [String]?
     public init(type: String, groupID: String, sourcePeerID: String, targetPeerID: String) {
-        self.type = type; self.groupID = groupID; self.sourcePeerID = sourcePeerID; self.targetPeerID = targetPeerID
+        self.type = type;
+        self.groupID = groupID;
+        self.sourcePeerID = sourcePeerID;
+        self.targetPeerID = targetPeerID
     }
 }
 public struct CapturedInput: Sendable {
@@ -42,6 +49,7 @@ public struct CapturedInput: Sendable {
     public var scrollPhase: Int?
     public var momentumPhase: Int?
     public var preciseScroll: Bool?
+    public var functionSlot: String?
     public var clickCount: Int?
     public var hardwareMotion: Bool?
     public var button: Int
@@ -50,33 +58,93 @@ public struct CapturedInput: Sendable {
     public var screenID: String?
     public var x: Double
     public var y: Double
-    public init(_ type: String, key: String? = nil, command: String? = nil, text: String? = nil, button: Int = 0, deltaX: Double = 0, deltaY: Double = 0, scrollPhase: Int? = nil, momentumPhase: Int? = nil, preciseScroll: Bool? = nil,
-                screenID: String? = nil, x: Double = 0, y: Double = 0, clickCount: Int? = nil, hardwareMotion: Bool? = nil) {
-        self.hardwareMotion = hardwareMotion; self.type = type; self.key = key; self.command = command; self.text = text; self.clickCount = clickCount; self.button = button; self.deltaX = deltaX; self.deltaY = deltaY
-        self.scrollPhase = scrollPhase; self.momentumPhase = momentumPhase; self.preciseScroll = preciseScroll; self.screenID = screenID; self.x = x; self.y = y
+    public init(
+        _ type: String, key: String? = nil, command: String? = nil, text: String? = nil, button: Int = 0,
+        deltaX: Double = 0, deltaY: Double = 0, scrollPhase: Int? = nil, momentumPhase: Int? = nil,
+        preciseScroll: Bool? = nil, screenID: String? = nil, x: Double = 0, y: Double = 0, clickCount: Int? = nil,
+        hardwareMotion: Bool? = nil, functionSlot: String? = nil
+    ) {
+        self.functionSlot = functionSlot;
+        self.hardwareMotion = hardwareMotion;
+        self.type = type;
+        self.key = key;
+        self.command = command;
+        self.text = text;
+        self.clickCount = clickCount;
+        self.button = button;
+        self.deltaX = deltaX;
+        self.deltaY = deltaY
+        self.scrollPhase = scrollPhase;
+        self.momentumPhase = momentumPhase;
+        self.preciseScroll = preciseScroll;
+        self.screenID = screenID;
+        self.x = x;
+        self.y = y
+    }
+}
+// Angle is measured from vertical; subtract the cone boundary instead of opening a gate.
+public enum HorizontalScrollFilter {
+    public static func apply(_ dx: Double, dy: Double, angle: Double) -> Double {
+        guard dx.isFinite, dy.isFinite else { return dx }
+        let angle = angle.isFinite ? max(0, min(90, angle)) : 30
+        if angle == 0 { return dx }
+        if angle == 90 { return 0 }
+        let excess = max(0, abs(dx) - abs(dy) * tan(angle * .pi / 180))
+        return dx < 0 ? -excess : excess
     }
 }
 public enum PointerRouter {
     public static func center(_ screen: ScreenGeometry, owner: String, epoch: UInt64) -> PointerState {
-        PointerState(screenID: screen.id, x: screen.x + screen.width / 2, y: screen.y + screen.height / 2, ownerPeerID: owner, epoch: epoch)
+        PointerState(
+            screenID: screen.id, x: screen.x + screen.width / 2, y: screen.y + screen.height / 2, ownerPeerID: owner,
+            epoch: epoch)
     }
-    public static func move(_ pointer: PointerState, screens: [ScreenGeometry], dx: Double, dy: Double) -> PointerState {
-        guard dx.isFinite, dy.isFinite, var screen = screens.first(where: { $0.id == pointer.screenID }) else { return pointer }
-        var result = pointer; var x = pointer.x; var y = pointer.y; var dx = dx; var dy = dy
+    public static func move(_ pointer: PointerState, screens: [ScreenGeometry], dx: Double, dy: Double) -> PointerState
+    {
+        guard dx.isFinite, dy.isFinite, var screen = screens.first(where: { $0.id == pointer.screenID }) else {
+            return pointer
+        }
+        var result = pointer;
+        var x = pointer.x;
+        var y = pointer.y;
+        var dx = dx;
+        var dy = dy
         for _ in 0...screens.count {
             let tx = dx > 0 ? (screen.x + screen.width - x) / dx : dx < 0 ? (screen.x - x) / dx : Double.infinity
             let ty = dy > 0 ? (screen.y + screen.height - y) / dy : dy < 0 ? (screen.y - y) / dy : Double.infinity
-            let t = max(0, min(1, min(tx, ty))); x += dx * t; y += dy * t
+            let t = max(0, min(1, min(tx, ty)));
+            x += dx * t;
+            y += dy * t
             if t >= 1 { break }
             let px = x + (dx > 0 ? 0.001 : dx < 0 ? -0.001 : 0), py = y + (dy > 0 ? 0.001 : dy < 0 ? -0.001 : 0)
-            guard let next = screens.first(where: { $0.id != screen.id && ScreenGeometry.touches(screen, $0)
-                && px >= $0.x && px < $0.x + $0.width && py >= $0.y && py < $0.y + $0.height }) else {
-                if tx <= ty { x = max(screen.x, min(x, screen.x + screen.width - 0.001)); dx = 0 } else { dx *= 1 - t }
-                if ty <= tx { y = max(screen.y, min(y, screen.y + screen.height - 0.001)); dy = 0 } else { dy *= 1 - t }
-                if dx == 0 && dy == 0 { break }; continue
+            guard
+                let next = screens.first(where: {
+                    $0.id != screen.id && ScreenGeometry.touches(screen, $0) && px >= $0.x && px < $0.x + $0.width
+                        && py >= $0.y && py < $0.y + $0.height
+                })
+            else {
+                if tx <= ty {
+                    x = max(screen.x, min(x, screen.x + screen.width - 0.001));
+                    dx = 0
+                } else {
+                    dx *= 1 - t
+                }
+                if ty <= tx {
+                    y = max(screen.y, min(y, screen.y + screen.height - 0.001));
+                    dy = 0
+                } else {
+                    dy *= 1 - t
+                }
+                if dx == 0 && dy == 0 { break };
+                continue
             }
-            screen = next; dx *= 1 - t; dy *= 1 - t
+            screen = next;
+            dx *= 1 - t;
+            dy *= 1 - t
         }
-        result.screenID = screen.id; result.x = x; result.y = y; return result
+        result.screenID = screen.id;
+        result.x = x;
+        result.y = y;
+        return result
     }
 }

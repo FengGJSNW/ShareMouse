@@ -1,8 +1,8 @@
 #ifndef ReleaseVersion
-  #define ReleaseVersion "v0.1.0-alpha.1"
+  #define ReleaseVersion "v0.1.0-alpha.2"
 #endif
 #ifndef NumericVersion
-  #define NumericVersion "0.1.0.1"
+  #define NumericVersion "0.1.0.26"
 #endif
 #ifndef PublishDir
   #error PublishDir must point to the self-contained win-x64 output
@@ -37,7 +37,7 @@ LZMANumBlockThreads=2
 WizardStyle=modern
 CloseApplications=no
 RestartApplications=no
-InfoBeforeFile=..\INSTALLING.md
+InfoBeforeFile=..\安装说明.txt
 UninstallDisplayName=ShareMouse {#ReleaseVersion} (x64)
 
 [Languages]
@@ -58,7 +58,7 @@ Name: "networkaccess"; Description: "{cm:NetworkAccess}"
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb"
-Source: "..\INSTALLING.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\安装说明.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\ShareMouse"; Filename: "{app}\ShareMouse.exe"; WorkingDir: "{app}"

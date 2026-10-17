@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import XCTest
+
 @testable import ShareMouseCore
 
 final class BLEBridgeTests: XCTestCase {
@@ -13,7 +14,8 @@ final class BLEBridgeTests: XCTestCase {
             queue.async {
                 do {
                     try bridge.listen { result in continuation.resume(with: result) }
-                    bridge.receive(first); bridge.receive(second)
+                    bridge.receive(first);
+                    bridge.receive(second)
                 } catch { continuation.resume(throwing: error) }
             }
         }
@@ -22,11 +24,15 @@ final class BLEBridgeTests: XCTestCase {
         queue.asyncAfter(deadline: .now() + 5) { connection.cancel() }
         let bytes: Data = try await withCheckedThrowingContinuation { continuation in
             connection.receive(minimumIncompleteLength: 1024, maximumLength: 1024) { data, _, _, error in
-                if let error { continuation.resume(throwing: error) }
-                else { continuation.resume(returning: data ?? Data()) }
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: data ?? Data())
+                }
             }
         }
         XCTAssertEqual(bytes, first + second)
-        connection.cancel(); queue.async { bridge.close() }
+        connection.cancel();
+        queue.async { bridge.close() }
     }
 }
