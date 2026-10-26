@@ -40,6 +40,8 @@ public sealed class PairingController : IDisposable
     private readonly InputService input;
     private readonly WindowsInputContext inputContext = new();
     private readonly WindowsInputAdapter inputAdapter;
+    private readonly WindowsSessionMonitor sessionMonitor;
+    private bool availabilityBlocked, resumeWithoutClaim;
     private readonly ComputerUseService computer;
     private readonly WindowsComputerAdapter computerAdapter = new();
     private MCPServer? mcp;
@@ -118,7 +120,7 @@ public sealed class PairingController : IDisposable
             notifications.Configure();
         registry = new PeerRegistry(directory);
         trustAsked.UnionWith(registry.All().Select(p => p.PeerID));
-        identity = new IdentityStore(peer.Id.Value.ToString("D"));
+        identity = WindowsPrivilegeSession.LoadIdentity(peer.Id.Value.ToString("D"));
         var code = RandomNumberGenerator.GetInt32(1_000_000).ToString("D6");
         var secret = "";
         localCode = code;
@@ -191,7 +193,7 @@ public sealed class PairingController : IDisposable
         input.TargetKeyHandler = eventData => CaptureHistory(eventData);
         computer = new ComputerUseService(localId, peer.Name, manager, files, clipboard, new DispatcherSynchronizationContext(view.Dispatcher),
             () => LocalScreens(localId), computerAdapter.Info, computerAdapter.Capture, (value, screen, x, y) => { WindowsInputStatus.EnsureCanInject(); if (value.Type == "relativeMove") computerAdapter.MoveRelative(value); else inputAdapter.Inject(value, screen, x, y); },
-            () => { var resume = input.Enabled; computerInputPauseRevision = inputPauseRevision; sharingShortcut.Reset(); clipboardShortcut.Reset(); input.Pause(); return resume; }, resume => { computerAdapter.Stop(); if (!disposed && computerInputPauseRevision == inputPauseRevision) { automaticInputPending |= resume; StartAutomaticInput(); } }, () => WindowsComputerAdapter.DesktopAvailable, computerAdapter.Mark, diagnostic: text => record(LogLevel.Info, text), controlChanged: (active, reason) => { if (active) computerAdapter.BeginControl(); view.ShowMCPControl(active); notifications.MCPControl(active, reason); }, activity: notifications.MCPActivity, inputState: WindowsInputStatus.Capture, captureWithOptions: computerAdapter.Capture, pointerPreview: computerAdapter.Preview, focusApplication: computerAdapter.FocusApplication);
+            () => { var resume = input.Enabled; computerInputPauseRevision = inputPauseRevision; sharingShortcut.Reset(); clipboardShortcut.Reset(); input.Pause(); return resume; }, resume => { computerAdapter.Stop(); if (!disposed && computerInputPauseRevision == inputPauseRevision) automaticInputPending |= resume; StartAutomaticInput(); }, () => WindowsComputerAdapter.DesktopAvailable, computerAdapter.Mark, diagnostic: text => record(LogLevel.Info, text), controlChanged: (active, reason) => { if (active) computerAdapter.BeginControl(); view.ShowMCPControl(active); notifications.MCPControl(active, reason); }, activity: notifications.MCPActivity, inputState: WindowsInputStatus.Capture, captureWithOptions: computerAdapter.Capture, pointerPreview: computerAdapter.Preview, focusApplication: computerAdapter.FocusApplication);
         notifications.ExitMCPControl = ExitMCPControl;
         notifications.HideMCPToast = () => SaveMCPToastStyle("hidden");
         computer.AllowComputer = Preferences.AllowComputerUse;
@@ -308,6 +310,9 @@ public sealed class PairingController : IDisposable
         };
         bleAutoTimer.Start();
         autoTimer.Start();
+        sessionMonitor = new WindowsSessionMonitor(HwndSource.FromHwnd(new WindowInteropHelper(view).EnsureHandle()), text => record(LogLevel.Info, text));
+        sessionMonitor.Changed = () => inputContext.Post(_ => UpdateInputAvailability(), null);
+        UpdateInputAvailability();
         StartBluetooth();
         Refresh();
     }
@@ -661,7 +666,7 @@ public sealed class PairingController : IDisposable
     public async System.Threading.Tasks.Task EnableInput(bool requestPeers = false)
     {
         peerResumePending |= requestPeers;
-        if (disposed || speedBusy || computer.Controlling || inputStarting || pendingConnectionDialogs > 0)
+        if (disposed || availabilityBlocked || speedBusy || computer.Controlling || inputStarting || pendingConnectionDialogs > 0)
             return;
         inputStarting = true;
         var revision = inputPauseRevision;
@@ -669,7 +674,8 @@ public sealed class PairingController : IDisposable
         {
             inputAdapter.Start();
             if (!input.Enabled)
-                await input.Enable();
+                await input.Enable(claimControl: !resumeWithoutClaim);
+            resumeWithoutClaim = false;
             if (disposed || revision != inputPauseRevision || computer.Controlling)
                 input.Pause();
             else if (peerResumePending && input.Enabled)
@@ -684,6 +690,7 @@ public sealed class PairingController : IDisposable
     }
     public async System.Threading.Tasks.Task ReconnectInput()
     {
+        resumeWithoutClaim = false;
         sharingRequested = true;
         automaticInputPending = true;
         await EnableInput(requestPeers: true);
@@ -744,11 +751,43 @@ public sealed class PairingController : IDisposable
     }
     public void PauseInput()
     {
+        resumeWithoutClaim = false;
         sharingRequested = false;
         inputPauseRevision++;
         automaticInputPending = false;
         input.Pause();
         view.ShowInputStatus("键鼠共享已暂停，本机输入已恢复");
+    }
+    public void SetAutomaticRelease(bool lid, bool screenLock)
+    {
+        Preferences.ReleaseOnLidClose = lid;
+        Preferences.ReleaseOnLock = screenLock;
+        Preferences.Save();
+        view.ShowInputOptions(Preferences);
+        UpdateInputAvailability();
+    }
+    private void UpdateInputAvailability()
+    {
+        var blocked = Preferences.ReleaseOnLidClose && sessionMonitor.LidClosed == true
+            || Preferences.ReleaseOnLock && sessionMonitor.ScreenLocked;
+        if (disposed || blocked == availabilityBlocked) return;
+        availabilityBlocked = blocked;
+        if (blocked)
+        {
+            inputPauseRevision++;
+            automaticInputPending = sharingRequested;
+            sharingShortcut.Reset(); clipboardShortcut.Reset(); history?.ResetCapture();
+            input.Pause();
+            view.ShowInputStatus("合盖／锁屏，键鼠共享暂时释放；开盖并解锁后自动恢复");
+            record(LogLevel.Info, $"InputAvailabilitySuspended lid={sessionMonitor.LidClosed == true} locked={sessionMonitor.ScreenLocked}");
+        }
+        else if (sharingRequested)
+        {
+            automaticInputPending = true;
+            resumeWithoutClaim = true;
+            record(LogLevel.Info, "InputAvailabilityRestored");
+            StartAutomaticInput();
+        }
     }
     public void SaveMCPSettings(bool enabled, bool computerUse, bool files, bool hints)
     {
@@ -781,7 +820,7 @@ public sealed class PairingController : IDisposable
         {
             if (Preferences.McpEnabled)
             {
-                mcp ??= new MCPServer(computer, dataDirectory);
+                mcp ??= WindowsPrivilegeSession.AsProfileUser(() => new MCPServer(computer, dataDirectory));
                 mcp.Start();
                 _ = manager.SetCapabilityAsync("mcp-server", true);
                 view.ShowMCPStatus("MCP · 127.0.0.1:49170 · 已启用");
@@ -933,7 +972,7 @@ public sealed class PairingController : IDisposable
     }
     private void StartAutomaticInput()
     {
-        if (!disposed && !speedBusy && sharingRequested && !computer.Controlling && automaticInputPending && !connectionPromptOpen && pendingConnectionDialogs == 0 && !inputStarting && !input.Enabled && group?.Online.Length > 1)
+        if (!disposed && !availabilityBlocked && !speedBusy && sharingRequested && !computer.Controlling && automaticInputPending && !connectionPromptOpen && pendingConnectionDialogs == 0 && !inputStarting && !input.Enabled && group?.Online.Length > 1)
         {
             automaticInputPending = false;
             _ = EnableInput();
@@ -1241,6 +1280,7 @@ public sealed class PairingController : IDisposable
     public void Dispose()
     {
         disposed = true;
+        sessionMonitor.Dispose();
         mcp?.Dispose();
         computer.Dispose();
         computerAdapter.Stop();

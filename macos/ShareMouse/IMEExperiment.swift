@@ -96,9 +96,7 @@ import SwiftUI
             close();
             return nil
         }
-        if event.type == "keyDown", key == "Escape",
-            ["Control", "Alt", "Shift"].allSatisfy({ prefix in held.contains { $0.hasPrefix(prefix) } })
-        {
+        if event.type == "keyDown", key == "Escape", SharingShortcut.isEmergencyChord(held, platform: "macos") {
             input?.pause();
             close();
             return true
@@ -162,7 +160,7 @@ import SwiftUI
 private struct IMEShortcutHints: View {
     var body: some View {
         HStack {
-            SMKeyHint(keys: ["⌃", "⌥", "⇧", "⎋"], text: "紧急释放")
+            SMKeyHint(keys: ["⌘", "⌃", "⇧", "⎋"], text: "紧急释放")
             Spacer()
             SMKeyHint(keys: ["⌃", "⌥", "I"], text: "开关输入法模式")
         }

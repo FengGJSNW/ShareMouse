@@ -448,7 +448,8 @@ public sealed class SessionManager : IAsyncDisposable
         }
         finally { FinishHandshake(certificate.PeerID); }
     }
-    public async Task<bool> StartQuicListener(int port = 49164)
+    public Task<bool> StartQuicListener(int port = 49164) => identity.AuthenticateAsync(() => StartQuicListenerAsIdentity(port));
+    private async Task<bool> StartQuicListenerAsIdentity(int port)
     {
         if (!QuicListener.IsSupported)
         {
@@ -1216,9 +1217,8 @@ public sealed class SessionManager : IAsyncDisposable
     {
         if (!sessions.TryGetValue(peerId, out var item))
             throw new IOException("Peer disconnected.");
-        using var deadline = channel == "input" ? CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token) : null;
-        deadline?.CancelAfter(TimeSpan.FromSeconds(3));
-        var cancellation = deadline?.Token ?? lifetime.Token;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        var cancellation = deadline.Token;
         var preferred = channel == "input" ? "quic" : "tcp";
         string? route = null;
         if (channel == "input")
@@ -1228,6 +1228,8 @@ public sealed class SessionManager : IAsyncDisposable
                 route = policy.Choose(item.Links.Keys, BluetoothInputOnly, Environment.TickCount64 / 1000.0);
         }
         var link = transport ?? (route is not null ? item.Links.GetValueOrDefault(route) : item.Links.GetValueOrDefault(preferred)) ?? item.Links.GetValueOrDefault("tcp") ?? item.Links.GetValueOrDefault("quic") ?? item.Links.GetValueOrDefault("ble") ?? throw new IOException("Peer disconnected.");
+        // A stuck background write must not hold the stream gate and its heartbeats forever.
+        deadline.CancelAfter(TimeSpan.FromSeconds(channel == "input" ? 3 : link.Kind == "ble" ? 60 : 10));
         // Serialize sequence allocation and submission per stream, so idle BLE cannot stall LAN input.
         var sendGate = item.SendGates.GetOrAdd(link.Kind, _ => new SemaphoreSlim(1, 1));
         await sendGate.WaitAsync(cancellation);
@@ -1265,9 +1267,9 @@ public sealed class SessionManager : IAsyncDisposable
             {
                 await link.SendAsync(frame, cancellation);
             }
-            catch (OperationCanceledException) when (deadline?.IsCancellationRequested == true && !lifetime.IsCancellationRequested)
+            catch (OperationCanceledException) when (deadline.IsCancellationRequested && !lifetime.IsCancellationRequested)
             {
-                log("InputWriteTimedOut transport=" + link.Kind);
+                log("SessionWriteTimedOut transport=" + link.Kind + " channel=" + (channel ?? type));
                 _ = link.DisposeAsync();
                 throw;
             }

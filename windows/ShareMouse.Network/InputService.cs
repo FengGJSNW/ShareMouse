@@ -406,6 +406,8 @@ public sealed class InputService : IDisposable
             if (pointer?.OwnerPeerID == peer)
                 Recover("蓝牙输入链路已断开，已释放本机控制", false);
         }
+        if (Enabled && pointer?.OwnerPeerID == id && inputPeers.Except(oldInput).Any())
+            Broadcast("control");
         if (!oldBLE.SetEquals(blePeers))
             RefreshInputRoute();
         if (Enabled)
@@ -440,7 +442,7 @@ public sealed class InputService : IDisposable
     }
     private ScreenGeometry[] UsableScreens() => group?.Layout.Where(s => online.Contains(s.PeerID) && (s.PeerID == id || inputPeers.Contains(s.PeerID))).ToArray() ?? [];
     private ScreenGeometry? Active => group?.Layout.FirstOrDefault(s => s.Id == pointer?.ScreenID);
-    public async Task Enable()
+    public async Task Enable(bool claimControl = true)
     {
         var round = ++generation;
         if (group is null || online.Count < 2)
@@ -450,16 +452,16 @@ public sealed class InputService : IDisposable
         heard.Clear();
         StartHighRateTimer();
         Enabled = true;
-        pointer = PointerRouter.Center(screen, id, (pointer?.Epoch ?? 0) + 1);
+        pointer = PointerRouter.Center(screen, id, (pointer?.Epoch ?? 0) + (claimControl ? 1UL : 0UL));
         noiseX = noiseY = 0;
-        MoveLocal();
+        if (claimControl) MoveLocal();
         RestrictCursor();
         if (!Enabled)
             return;
         await ChangeCapability(true);
         if (round != generation)
             return;
-        if (pointer?.OwnerPeerID == id)
+        if (claimControl && pointer?.OwnerPeerID == id)
             Broadcast("control");
         log($"InputMode bluetoothOnly={manager.BluetoothInputOnly} bleWindow=adaptive-max16 maxPendingAgeMs=80 coalesceMs=2 render=immediate");
         log($"InputEnabled targetPeerId={Active?.PeerID ?? "none"} epoch={pointer?.Epoch ?? 0}");
@@ -1042,7 +1044,7 @@ public sealed class InputService : IDisposable
             ReleasePeer(peer);
             if (pointer?.OwnerPeerID == peer || Active?.PeerID == peer)
             {
-                Recover("对端已停止输入共享，本机已恢复", false);
+                Recover("对端已停止输入共享，本机已恢复", false, Active?.PeerID != id);
             }
             return;
         }
@@ -1399,7 +1401,7 @@ public sealed class InputService : IDisposable
             }
         }
     }
-    private void Recover(string reason, bool announce = true)
+    private void Recover(string reason, bool announce = true, bool reposition = true)
     {
         if (Environment.TickCount64 - recoveryReported > 1000)
         {
@@ -1420,7 +1422,7 @@ public sealed class InputService : IDisposable
         {
             pointer = PointerRouter.Center(screen, id, (pointer?.Epoch ?? 0) + 1);
             restrict(false, false);
-            MoveLocal();
+            if (reposition) MoveLocal();
             if (announce)
                 Broadcast("control");
         }

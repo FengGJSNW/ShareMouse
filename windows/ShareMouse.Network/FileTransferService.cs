@@ -4,7 +4,9 @@ namespace ShareMouse.Network;
 
 public sealed class FileTransferService : IDisposable
 {
-    private readonly string id, file;
+    private readonly string id, file, progressFile;
+    private string progressGeneration = Guid.NewGuid().ToString("D");
+    private Dictionary<string, Dictionary<string, long>> progressOffsets = new();
     private readonly SessionManager manager;
     private readonly ClipboardService clipboard;
     private readonly SynchronizationContext context;
@@ -52,9 +54,11 @@ public sealed class FileTransferService : IDisposable
         this.partialFailure = partialFailure;
         this.deleteAll = deleteAll;
         file = Path.Combine(directory, "file-transfers.json");
+        progressFile = Path.Combine(directory, "file-transfers-progress.json");
         if (File.Exists(file))
         {
             var saved = JsonSerializer.Deserialize<FileTransferStore>(File.ReadAllText(file), json) ?? throw new IOException("Invalid transfer store.");
+            progressGeneration = saved.ProgressGeneration ?? Guid.NewGuid().ToString("D");
             foreach (var transaction in saved.Transactions)
                 transactions[transaction.Entry.Id] = transaction;
             foreach (var replica in saved.Replicas ?? [])
@@ -70,6 +74,21 @@ public sealed class FileTransferService : IDisposable
                 }
                 tasks[task.Id] = task;
             }
+            // Ignore incomplete/stale progress; the durable full store remains authoritative.
+            try
+            {
+                if (File.Exists(progressFile) && JsonSerializer.Deserialize<FileProgressStore>(File.ReadAllText(progressFile), json) is { } progress
+                    && progress.Generation == saved.ProgressGeneration)
+                {
+                    progressOffsets = progress.Tasks;
+                    foreach (var task in tasks.Values)
+                        foreach (var item in task.Files.Where(f => !f.Completed))
+                            if (progress.Tasks.GetValueOrDefault(task.Id)?.GetValueOrDefault(item.Item.Id) is { } offset
+                                && offset >= item.Received && offset <= item.Item.Size)
+                                item.Received = offset;
+                }
+            }
+            catch (Exception error) when (error is IOException or JsonException) { }
         }
         clipboard.Changed += ClipboardChanged;
         manager.Receive("files", (peer, bytes) => { context.Post(async _ => { try { await Receive(peer, bytes); } catch { log("FileRequestRejected"); } }, null); return Task.CompletedTask; });
@@ -120,15 +139,25 @@ public sealed class FileTransferService : IDisposable
         var previous = checkpoints.GetValueOrDefault(task.Id);
         if (now - previous.time >= 500 || bytes - previous.bytes >= 1024 * 1024)
         {
+            var offsets = new Dictionary<string, Dictionary<string, long>>(progressOffsets)
+            {
+                [task.Id] = task.Files.Where(f => !f.Completed && !f.Item.Directory).ToDictionary(f => f.Item.Id, f => f.Received)
+            };
+            File.WriteAllText(progressFile + ".tmp", JsonSerializer.Serialize(new FileProgressStore(progressGeneration, offsets), json));
+            File.Move(progressFile + ".tmp", progressFile, true);
+            progressOffsets = offsets;
             checkpoints[task.Id] = (bytes, now);
-            Save();
+            Changed?.Invoke(Tasks);
         }
     }
     private void Save()
     {
-        var saved = new FileTransferStore(transactions.Values.ToArray(), permits.Values.ToArray(), tasks.Values.ToArray(), replicas.Values.ToArray());
+        var generation = Guid.NewGuid().ToString("D");
+        var saved = new FileTransferStore(transactions.Values.ToArray(), permits.Values.ToArray(), tasks.Values.ToArray(), replicas.Values.ToArray(), generation);
         File.WriteAllText(file + ".tmp", JsonSerializer.Serialize(saved, json));
         File.Move(file + ".tmp", file, true);
+        progressGeneration = generation;
+        progressOffsets.Clear();
         Changed?.Invoke(Tasks);
     }
     public void Update(SharedGroup? value, string[] peers, SessionInfo[] sessions)

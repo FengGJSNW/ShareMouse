@@ -51,7 +51,7 @@ public sealed class SecureQuic : ISessionTransport
     {
         var addresses = await Dns.GetHostAddressesAsync(host, cancellation);
         var address = addresses.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) ?? addresses.First();
-        var connection = await QuicConnection.ConnectAsync(new QuicClientConnectionOptions
+        var connection = await identity.AuthenticateAsync(async () => await QuicConnection.ConnectAsync(new QuicClientConnectionOptions
         {
             RemoteEndPoint = new IPEndPoint(address, port),
             DefaultCloseErrorCode = 0,
@@ -69,7 +69,7 @@ public sealed class SecureQuic : ISessionTransport
                 AllowTlsResume = false,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck
             }
-        }, cancellation);
+        }, cancellation));
         try
         {
             var stream = await connection.OpenOutboundStreamAsync(QuicStreamType.Bidirectional, cancellation);

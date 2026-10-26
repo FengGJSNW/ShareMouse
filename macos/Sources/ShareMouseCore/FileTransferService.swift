@@ -3,6 +3,9 @@ import Foundation
 @MainActor public final class FileTransferService {
     private let id: String
     private let file: URL
+    private let progressFile: URL
+    private var progressGeneration = UUID().uuidString
+    private var progressOffsets: [String: [String: Int64]] = [:]
     private let manager: SessionManager
     private let clipboard: ClipboardService
     private let changed: ([TransferTask]) -> Void
@@ -55,8 +58,10 @@ import Foundation
         self.partialFailure = partialFailure;
         self.deleteAll = deleteAll
         file = directory.appendingPathComponent("file-transfers.json")
+        progressFile = directory.appendingPathComponent("file-transfers-progress.json")
         if FileManager.default.fileExists(atPath: file.path) {
             let saved = try JSONDecoder().decode(FileTransferStore.self, from: Data(contentsOf: file))
+            progressGeneration = saved.progressGeneration ?? UUID().uuidString
             transactions = Dictionary(uniqueKeysWithValues: saved.transactions.map { ($0.entry.id, $0) })
             replicas = Dictionary(uniqueKeysWithValues: (saved.replicas ?? []).map { ($0.entry.id, $0) })
             permits = Dictionary(uniqueKeysWithValues: saved.permits.map { ($0.taskID, $0) })
@@ -66,6 +71,19 @@ import Foundation
                     task.pausedBy = task.direction == "send" ? task.remotePeerID : id
                 };
                 tasks[task.id] = task
+            }
+            if let data = try? Data(contentsOf: progressFile),
+                let progress = try? JSONDecoder().decode(FileProgressStore.self, from: data),
+                progress.generation == saved.progressGeneration
+            {
+                progressOffsets = progress.tasks
+                for task in tasks.values {
+                    for item in task.files where !item.completed {
+                        if let offset = progress.tasks[task.id]?[item.item.id],
+                            offset >= item.received, offset <= item.item.size
+                        { item.received = offset }
+                    }
+                }
             }
         }
     }
@@ -84,15 +102,24 @@ import Foundation
         {
             return
         };
-        checkpoints[task.id] = (bytes, .now);
-        try save()
+        var offsets = progressOffsets
+        offsets[task.id] = Dictionary(uniqueKeysWithValues:
+            task.files.filter { !$0.completed && !$0.item.directory }.map { ($0.item.id, $0.received) })
+        try JSONEncoder().encode(FileProgressStore(generation: progressGeneration, tasks: offsets))
+            .write(to: progressFile, options: .atomic)
+        progressOffsets = offsets
+        checkpoints[task.id] = (bytes, .now)
+        changed(currentTasks)
     }
     private func save() throws {
+        let generation = UUID().uuidString
         try JSONEncoder().encode(
             FileTransferStore(
                 transactions: Array(transactions.values), permits: Array(permits.values), tasks: currentTasks,
-                replicas: Array(replicas.values))
+                replicas: Array(replicas.values), progressGeneration: generation)
         ).write(to: file, options: .atomic)
+        progressGeneration = generation
+        progressOffsets = [:]
         changed(currentTasks)
     }
     public func clipboardChanged(_ entry: ClipboardEntry?) {

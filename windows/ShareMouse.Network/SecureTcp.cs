@@ -76,7 +76,7 @@ public sealed class SecureTcp : ISessionTransport
         {
             await client.ConnectAsync(host, port, cancellation);
             transport = new SecureTcp(client, verify, kind);
-            await transport.stream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+            await identity.AuthenticateAsync(() => transport.stream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
             {
                 TargetHost = "ShareMouse",
                 ClientCertificates = new X509CertificateCollection { identity.Certificate },
@@ -84,7 +84,7 @@ public sealed class SecureTcp : ISessionTransport
                 EnabledSslProtocols = SslProtocols.Tls13,
                 AllowTlsResume = false,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck
-            }, cancellation);
+            }, cancellation));
             return transport;
         }
         catch { if (transport is not null) await transport.DisposeAsync(); else client.Dispose(); throw; }
@@ -97,14 +97,14 @@ public sealed class SecureTcp : ISessionTransport
         var transport = new SecureTcp(client, verify, kind);
         try
         {
-            await transport.stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+            await identity.AuthenticateAsync(() => transport.stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
             {
                 ServerCertificate = identity.Certificate,
                 ClientCertificateRequired = true,
                 EnabledSslProtocols = SslProtocols.Tls13,
                 AllowTlsResume = false,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck
-            }, cancellation);
+            }, cancellation));
             return transport;
         }
         catch { await transport.DisposeAsync(); throw; }
@@ -138,7 +138,8 @@ public sealed class SecureTcp : ISessionTransport
     }
     public async ValueTask DisposeAsync()
     {
-        await stream.DisposeAsync();
+        // Abort the socket first, including a write stalled behind TCP backpressure.
         client.Dispose();
+        await stream.DisposeAsync().ConfigureAwait(false);
     }
 }

@@ -99,7 +99,8 @@ public sealed class TransferTask
     [System.Text.Json.Serialization.JsonIgnore]
     public long Total => Files.Count == 0 ? Entry.TotalBytes ?? 0 : Files.Sum(f => f.Item.Size);
 }
-public sealed record FileTransferStore(FileTransaction[] Transactions, FilePermit[] Permits, TransferTask[] Tasks, FileTransaction[]? Replicas = null);
+public sealed record FileTransferStore(FileTransaction[] Transactions, FilePermit[] Permits, TransferTask[] Tasks, FileTransaction[]? Replicas = null, string? ProgressGeneration = null);
+public sealed record FileProgressStore(string Generation, Dictionary<string, Dictionary<string, long>> Tasks);
 public sealed class FilePacket
 {
     public required string Type

@@ -43,3 +43,5 @@ dotnet run --project windows/ShareMouse.SessionProbe -c Release --no-build -- --
 - `SharingTests.testNetworkRecoveryWithoutBonjourKeepsBLEAndPinnedIdentity`
 
 实体键盘、固件 FnLock、特定系统功能及实际网络环境仍需人工验收。
+
+Alpha.3 release check (2026-10-26): 96 Swift tests passed and one environment-dependent test skipped; the two baseline network fixtures listed above were excluded. Windows solution, function-slot, availability, file-transfer and blocked TCP-write checks passed; physical acceptance remains separate.

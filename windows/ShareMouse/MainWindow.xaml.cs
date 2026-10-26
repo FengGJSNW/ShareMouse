@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     public MainWindow(Peer? peer, string? startupError, Action openLogs, Action<LogLevel, string> record)
     {
         InitializeComponent();
+        CurrentPrivilegeStatus.Text = "当前权限：" + (WindowsPrivilegeSession.IsTrustedInstaller ? "TrustedInstaller" : WindowsInputStatus.IsElevated ? "管理员" : "普通用户");
         AppearanceChoice.SelectedIndex = Theme.Mode == "dark" ? 2 : Theme.Mode == "light" ? 1 : 0;
         this.openLogs = openLogs;
         this.record = record;
@@ -175,6 +176,8 @@ public partial class MainWindow : Window
         FnEnabledChoice.IsChecked = preferences.FnEnabled;
         FunctionKeysEnabledChoice.IsChecked = preferences.FunctionKeysEnabled;
         ScreenCrossingChoice.IsChecked = preferences.ScreenCrossingEnabled;
+        ReleaseOnLidCloseChoice.IsChecked = preferences.ReleaseOnLidClose;
+        ReleaseOnLockChoice.IsChecked = preferences.ReleaseOnLock;
         initializingSettings = previous;
     }
     private void KeyboardOptionsChanged(object sender, RoutedEventArgs e)
@@ -186,6 +189,11 @@ public partial class MainWindow : Window
     {
         if (!initializingSettings && pairing is not null)
             pairing.SetScreenCrossing(ScreenCrossingChoice.IsChecked == true);
+    }
+    private void AutomaticReleaseChanged(object sender, RoutedEventArgs e)
+    {
+        if (!initializingSettings && pairing is not null)
+            pairing.SetAutomaticRelease(ReleaseOnLidCloseChoice.IsChecked == true, ReleaseOnLockChoice.IsChecked == true);
     }
     private string behaviorPeerList = "";
     private void ShowRemoteBehaviorPeers(KnownPeer[] peers)
@@ -373,6 +381,26 @@ public partial class MainWindow : Window
         catch (System.ComponentModel.Win32Exception ex) { SettingsStatus.Text = ex.NativeErrorCode == 1223 ? "已取消管理员授权，ShareMouse 继续运行。" : "无法启动管理员实例：" + ex.Message; }
         catch (Exception ex) { SettingsStatus.Text = "无法重启：" + ex.Message; }
     }
+    private async void RestartTrustedInstallerClick(object sender, RoutedEventArgs e)
+    {
+        if (WindowsPrivilegeSession.IsTrustedInstaller)
+        {
+            SettingsStatus.Text = "ShareMouse 当前已具有 TrustedInstaller 权限；普通启动仍使用管理员权限。";
+            return;
+        }
+        TrustedInstallerRestartButton.IsEnabled = false;
+        SettingsStatus.Text = "正在调用 TrustInstaller-Start；新实例确认权限后才会退出当前实例…";
+        try
+        {
+            await WindowsPrivilegeSession.RestartAsync();
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            SettingsStatus.Text = "提权重启未完成，当前实例继续运行：" + ex.Message;
+            TrustedInstallerRestartButton.IsEnabled = true;
+        }
+    }
     private void CopyMCPConfigurationClick(object sender, RoutedEventArgs e) => pairing?.CopyMCPConfiguration();
     private void SaveSettingsClick(object sender, RoutedEventArgs e)
     {
@@ -389,7 +417,7 @@ public partial class MainWindow : Window
             bluetooth = adapter is null ? "未找到适配器" : $"适配器可用，Central={adapter.IsCentralRoleSupported}，Peripheral={adapter.IsPeripheralRoleSupported}";
         }
         catch { bluetooth = "不可用或未授权"; }
-        SettingsStatus.Text = "输入：" + (WindowsInputStatus.IsElevated ? "管理员权限，可操控同等级窗口" : "普通权限，启动授权未完成；请重新启动并允许管理员请求") + "\n蓝牙：" + bluetooth + "\n本地网络：配对服务端口 TCP 49160 / QUIC UDP 49164；连接受网络和防火墙影响";
+        SettingsStatus.Text = "输入：" + (WindowsPrivilegeSession.IsTrustedInstaller ? "TrustedInstaller 权限；用户配置：" + WindowsPrivilegeSession.UserName : WindowsInputStatus.IsElevated ? "管理员权限，可操控同等级窗口" : "普通权限，启动授权未完成；请重新启动并允许管理员请求") + "\n蓝牙：" + bluetooth + "\n本地网络：配对服务端口 TCP 49160 / QUIC UDP 49164；连接受网络和防火墙影响";
     }
     private void FinishPermissionsClick(object sender, RoutedEventArgs e) => pairing?.FinishPermissionSetup();
     private void HistoryClick(object sender, RoutedEventArgs e) => pairing?.OpenHistory();

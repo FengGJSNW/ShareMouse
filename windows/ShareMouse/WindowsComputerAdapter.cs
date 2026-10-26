@@ -327,7 +327,7 @@ public sealed class WindowsComputerAdapter
     {
         [FieldOffset(0)] public uint Level; [FieldOffset(8)] public uint SessionId; [FieldOffset(12)] public int State; [FieldOffset(16)] public int Flags;
     }
-    private static (bool? locked, bool? active) DesktopSession()
+    internal static (bool? locked, bool? active) DesktopSession()
     {
         var buffer = IntPtr.Zero;
         try

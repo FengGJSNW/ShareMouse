@@ -301,12 +301,16 @@ public sealed class HistoryService : IDisposable
             state.Data.Dispose();
         }
     }
+    public void ResetCapture()
+    {
+        held.Clear();
+        consumed.Clear();
+    }
     public void Dispose()
     {
         disposed = true;
         foreach (var key in incoming.Keys.ToArray())
             Fail(key);
-        held.Clear();
-        consumed.Clear();
+        ResetCapture();
     }
 }

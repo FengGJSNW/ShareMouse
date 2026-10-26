@@ -3,6 +3,65 @@ import XCTest
 @testable import ShareMouseCore
 
 final class SharingShortcutTests: XCTestCase {
+    @MainActor func testNativeEditorCutPassesThroughAndOnlyFileCutIsConsumed() {
+        let shortcut = ClipboardShortcut(platform: "macos")
+        var filesSelected = false, fileCuts = 0, pasteQueries = 0
+        shortcut.cutFiles = {
+            guard filesSelected else { return false }
+            fileCuts += 1
+            return true
+        }
+        func capture(_ event: CapturedInput) -> Bool {
+            shortcut.capture(
+                event,
+                active: {
+                    pasteQueries += 1;
+                    return false
+                }())
+        }
+        for modifier in ["MetaLeft", "MetaRight"] {
+            XCTAssertFalse(capture(CapturedInput("keyDown", key: modifier)))
+            for _ in 0..<3 { XCTAssertFalse(capture(CapturedInput("keyDown", key: "KeyX"))) }
+            XCTAssertFalse(capture(CapturedInput("keyUp", key: "KeyX")))
+            XCTAssertFalse(capture(CapturedInput("keyUp", key: modifier)))
+        }
+        XCTAssertEqual(fileCuts, 0, "An editor owns its Cut even without an AX selection")
+        XCTAssertEqual(pasteQueries, 0, "Native Cut must not query or fetch a shared pasteboard")
+        filesSelected = true
+        XCTAssertFalse(capture(CapturedInput("keyDown", key: "MetaLeft")))
+        for _ in 0..<8 { XCTAssertTrue(capture(CapturedInput("keyDown", key: "KeyX"))) }
+        XCTAssertTrue(capture(CapturedInput("keyUp", key: "KeyX")))
+        XCTAssertEqual(fileCuts, 1, "A held file Cut starts only one transaction")
+        filesSelected = false
+        XCTAssertFalse(capture(CapturedInput("keyDown", key: "KeyX")))
+        XCTAssertFalse(capture(CapturedInput("keyUp", key: "KeyX")))
+    }
+    @MainActor func testMacEmergencyChordReservesCommandAndSwappedPhysicalCommand() {
+        for (modifiers, swapped) in [
+            (["MetaLeft", "ControlRight", "ShiftLeft"], false), (["Fn", "ControlLeft", "ShiftRight"], true),
+            (["MetaRight", "ControlLeft", "ShiftRight"], true), (["AltLeft", "ControlRight", "ShiftLeft"], false),
+        ] {
+            let shortcut = SharingShortcut(platform: "macos")
+            var toggles = 0
+            shortcut.toggle = { toggles += 1 }
+            func capture(_ input: CapturedInput) -> Bool {
+                shortcut.capture(
+                    input, sourceKey: { MacInputAdapter.sourceKey($0, to: "windows", fnCommandSwapped: swapped) })
+            }
+            for key in modifiers { XCTAssertFalse(capture(CapturedInput("keyDown", key: key))) }
+            for _ in 0..<10 { XCTAssertTrue(capture(CapturedInput("keyDown", key: "Escape"))) }
+            XCTAssertEqual(toggles, 1, "A held emergency chord must not reconnect on auto-repeat")
+            XCTAssertTrue(capture(CapturedInput("keyUp", key: "Escape")))
+            for key in modifiers.reversed() { _ = capture(CapturedInput("keyUp", key: key)) }
+            XCTAssertFalse(capture(CapturedInput("keyDown", key: "Escape")))
+        }
+        for platform in ["macos", "windows"] {
+            XCTAssertFalse(
+                SharingShortcut.isEmergencyChord(["ControlLeft", "ShiftLeft"], platform: platform),
+                "Ctrl+Shift+Esc must remain available to the target")
+        }
+        XCTAssertFalse(SharingShortcut.isEmergencyChord(["MetaLeft", "ControlLeft", "ShiftLeft"], platform: "windows"))
+    }
     @MainActor func testPasteboardQueryOnlyRunsForPasteChord() {
         let shortcut = ClipboardShortcut(platform: "macos");
         var queries = 0;

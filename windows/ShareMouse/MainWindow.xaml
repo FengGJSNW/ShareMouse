@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="ShareMouse.MainWindow" Title="ShareMouse" Width="1080" Height="820" MinWidth="920" MinHeight="640" WindowStartupLocation="CenterScreen" Background="{DynamicResource CanvasBrush}" FontFamily="Segoe UI, Microsoft YaHei UI">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="ShareMouse.MainWindow" Title="ShareMouse" Icon="/ShareMouse.ico" Width="1080" Height="820" MinWidth="920" MinHeight="640" WindowStartupLocation="CenterScreen" Background="{DynamicResource CanvasBrush}" FontFamily="Segoe UI, Microsoft YaHei UI">
     <DockPanel>
         <Grid DockPanel.Dock="Bottom">
             <Grid.ColumnDefinitions>
@@ -122,6 +122,9 @@
                                     <Button Content="&#x65AD;&#x5F00;" Click="PauseInputClick"/>
                                     <Button Content="&#x91CD;&#x8FDE;" Click="ReconnectInputClick"/>
                                 </WrapPanel>
+                                <CheckBox x:Name="ReleaseOnLidCloseChoice" Content="合盖释放键鼠" Checked="AutomaticReleaseChanged" Unchecked="AutomaticReleaseChanged"/>
+                                <CheckBox x:Name="ReleaseOnLockChoice" Content="锁屏释放键鼠" Checked="AutomaticReleaseChanged" Unchecked="AutomaticReleaseChanged"/>
+                                <TextBlock Text="暂时释放本机键鼠共享，其他电脑继续使用；开盖／解锁后自动恢复。手动断开不会自动恢复，配对和文件连接保留。合盖检测需要设备提供盖子状态。" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}"/>
                                 <TextBlock Text="&#x672C;&#x673A;&#x6E38;&#x620F;&#x9F20;&#x6807;" Margin="0,8,0,2"/>
                                 <ComboBox x:Name="GameMouseChoice" SelectionChanged="GameMouseSelectionChanged">
                                     <ComboBoxItem Content="&#x81EA;&#x52A8;&#x8BC6;&#x522B;"/>
@@ -180,7 +183,11 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,0,0,8">
                         <GroupBox Header="&#x6743;&#x9650;">
+                            <StackPanel>
+                                <TextBlock x:Name="CurrentPrivilegeStatus" FontWeight="SemiBold" Margin="0,0,0,12"/>
                             <Button Content="&#x4EE5;&#x7BA1;&#x7406;&#x5458;&#x6743;&#x9650;&#x91CD;&#x542F;" Click="RestartElevatedClick" HorizontalAlignment="Left"/>
+                            <Button x:Name="TrustedInstallerRestartButton" Content="以 TrustedInstaller 权限重启" Click="RestartTrustedInstallerClick" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                            </StackPanel>
                         </GroupBox>
                         <GroupBox Header="MCP / &#x8FDC;&#x7A0B; Computer Use">
                             <StackPanel>

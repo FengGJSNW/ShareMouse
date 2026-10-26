@@ -1,6 +1,6 @@
 param(
- [string]$ReleaseVersion='v0.1.0-alpha.2',
- [int]$BuildNumber=26,
+ [string]$ReleaseVersion='v0.1.0-alpha.3',
+ [int]$BuildNumber=37,
  [Parameter(Mandatory=$true)][string]$ISCC
 )
 $ErrorActionPreference='Stop'

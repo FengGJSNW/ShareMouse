@@ -1,8 +1,8 @@
 #ifndef ReleaseVersion
-  #define ReleaseVersion "v0.1.0-alpha.2"
+  #define ReleaseVersion "v0.1.0-alpha.3"
 #endif
 #ifndef NumericVersion
-  #define NumericVersion "0.1.0.26"
+  #define NumericVersion "0.1.0.37"
 #endif
 #ifndef PublishDir
   #error PublishDir must point to the self-contained win-x64 output
@@ -17,6 +17,7 @@ AppName=ShareMouse
 AppVersion={#ReleaseVersion}
 AppVerName=ShareMouse {#ReleaseVersion}
 AppPublisher=ShareMouse Project
+SetupIconFile=..\..\resources\app-icon\ShareMouse.ico
 DefaultDirName={autopf}\ShareMouse
 DefaultGroupName=ShareMouse
 DisableProgramGroupPage=yes

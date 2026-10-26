@@ -15,7 +15,7 @@ Apple Development 身份用于开发测试。直接向其他用户分发 macOS �
 从 GitHub 仓库下载 `packaging/sign-install-macos.zsh`，然后在终端运行：
 
 ```sh
-zsh ./sign-install-macos.zsh "$HOME/Downloads/ShareMouse-macos-universal.dmg"
+zsh "$HOME/Downloads/sign-install-macos.zsh" "$HOME/Downloads/ShareMouse-v0.1.0-alpha.3-macos-universal.dmg"
 ```
 
 如果脚本与 `ShareMouse.app` 一起放在已挂载的 DMG 根目录中，也可以直接运行脚本，不传 DMG 路径。

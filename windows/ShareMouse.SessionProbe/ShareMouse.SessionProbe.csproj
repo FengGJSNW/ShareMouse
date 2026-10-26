@@ -10,6 +10,7 @@
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="..\ShareMouse\WindowsInputStatus.cs" Link="WindowsInputStatus.cs"/>
+        <Compile Include="..\ShareMouse\WindowsPrivilegeSession.cs" Link="WindowsPrivilegeSession.cs"/>
         <Compile Include="..\ShareMouse\WindowsRawFunctionInput.cs" Link="WindowsRawFunctionInput.cs"/>
     </ItemGroup>
     <ItemGroup>

@@ -56,7 +56,11 @@ import SwiftUI
 
     private func setupMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem?.button?.image = NSImage(systemSymbolName: "computermouse", accessibilityDescription: "ShareMouse")
+        let menuIcon = NSImage(named: "MenuBarTemplate")
+        menuIcon?.size = NSSize(width: 18, height: 18)
+        menuIcon?.isTemplate = true
+        menuIcon?.accessibilityDescription = "ShareMouse"
+        statusItem?.button?.image = menuIcon
         let menu = NSMenu()
         let show = NSMenuItem(title: "打开 ShareMouse", action: #selector(showMainWindow), keyEquivalent: "")
         show.target = self

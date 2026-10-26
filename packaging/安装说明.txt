@@ -1,14 +1,14 @@
-ShareMouse v0.1.0-alpha.2
+ShareMouse v0.1.0-alpha.3
 
 本版包含现有键鼠共享、剪贴板、文件传输、历史剪贴板与 MCP 功能，以及本机剪贴板处理、日志开关和 UI 更新；仍是测试版本，实际流畅度、UI 视觉和部分专项验收尚未完成。
 
 macOS 安装（macOS 14 或更新，Apple Silicon / Intel）
 1. 通过菜单栏菜单退出旧版 ShareMouse，再把 ShareMouse.app 拖入 Applications。
 2. 从“应用”启动。首次使用时按软件权限声明逐项授权：辅助功能、输入监控；蓝牙、Finder 自动化与屏幕录制只在使用对应功能时授权。
-3. 此包使用开发签名，未进行 Apple 公证。从浏览器下载后若系统拦截，请核对来源，在系统设置 → 隐私与安全性中使用“仍要打开”；不要关闭整个系统的安全检查。
+3. 公开包使用 ad-hoc 签名，未进行 Apple 公证；可参考随包文档，使用自己的 Apple Development 身份进行本机签名。从浏览器下载后若系统拦截，请核对来源，在系统设置 → 隐私与安全性中使用“仍要打开”；不要关闭整个系统的安全检查。
 
 Windows 安装（Windows 11 x64）
-1. 运行 ShareMouse-v0.1.0-alpha.2-windows-x64-setup.exe，确认 UAC，选择安装目录。安装包带 .NET 运行时，无需安装开发 SDK。
+1. 运行 ShareMouse-v0.1.0-alpha.3-windows-x64-setup.exe，确认 UAC，选择安装目录。安装包带 .NET 运行时，无需安装开发 SDK。
 2. 可选桌面快捷方式使用当前用户的实际桌面目录，不固定为 C 盘。可选网络规则只放行本程序的配对、发现与加密连接，不开放 MCP 的本机 HTTP 端口。
 3. 从开始菜单或桌面启动；软件仍按既有设计申请管理员权限。取消授权不启动低权限副本。
 4. 本包暂无 Windows 发布签名。出现“未知发布者”时需自行核对文件来源；没有通过 SmartScreen 信誉认证。
@@ -18,3 +18,5 @@ Windows 安装（Windows 11 x64）
 首次连接使用对方六位配对码及可选密钥，并由对方确认。普通共享无需 Python；MCP 的 stdio 桥另需可用的 Python 3。MCP 协议版本仍为 1.3.1。
 
 Windows 要求 11 是因为本软件使用系统 TLS 1.3 / QUIC 接口；Windows 10 不作为本 alpha 的支持系统。校园网的发现隔离、限速、BLE 硬件差异及仍存在的输入调度长尾，不以安装完成视为已解决。
+
+Windows 的 TrustedInstaller 重启为可选功能，需要 PowerShell 7 和自行配置的 TrustInstaller-Start 命令；普通安装与键鼠共享不依赖此命令，默认仍按用户管理员身份启动。

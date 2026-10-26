@@ -83,6 +83,13 @@ struct FileTransferStore: Codable {
     var permits: [FilePermit];
     var tasks: [TransferTask];
     var replicas: [FileTransaction]? = nil
+    var progressGeneration: String? = nil
+}
+// Progress is small and separate from the immutable catalogue/history. A full
+// save changes generation so a crash cannot replay offsets over newer state.
+struct FileProgressStore: Codable {
+    var generation: String
+    var tasks: [String: [String: Int64]]
 }
 struct FilePacket: Codable, Sendable {
     var type: String

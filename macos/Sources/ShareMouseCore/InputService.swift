@@ -340,6 +340,9 @@ import Foundation
             bleSentAt.removeValue(forKey: peer)
             if pointer?.ownerPeerID == peer { recover("蓝牙输入链路已断开，已释放本机控制", announce: false) }
         }
+        // A peer returning from lid/lock release needs the current owner, not
+        // the stale pointer it retained while unavailable.
+        if enabled, pointer?.ownerPeerID == id, !inputPeers.subtracting(oldInput).isEmpty { broadcast("control") }
         if oldBLE != blePeers { refreshInputRoute() }
         if enabled {
             status(
@@ -374,7 +377,7 @@ import Foundation
             sendHeld()
         }
     }
-    public func enable(preservingLocalCursor position: CapturedInput? = nil) async throws {
+    public func enable(preservingLocalCursor position: CapturedInput? = nil, claimControl: Bool = true) async throws {
         generation += 1;
         let round = generation
         guard group != nil, online.count > 1, let screen = usable.first(where: { $0.peerID == id && $0.primary }) else {
@@ -383,7 +386,7 @@ import Foundation
         // A paused interval must not count against the next input session's watchdog.
         heard = [:]
         startHighRateTimer()
-        let epoch = (pointer?.epoch ?? 0) + 1
+        let epoch = (pointer?.epoch ?? 0) + (claimControl ? 1 : 0)
         // Independent MCP never moves the user's cursor, including when normal sharing resumes.
         let preserved = position.flatMap { value -> PointerState? in
             guard value.x.isFinite, value.y.isFinite, (0...1).contains(value.x), (0...1).contains(value.y),
@@ -401,14 +404,14 @@ import Foundation
         if preserved != nil {
             renderTarget = nil;
             rendered = pointer
-        } else {
+        } else if claimControl {
             moveLocal()
         }
         restrictCursor();
         guard enabled else { return }
         await changeCapability(true).value;
         guard round == generation else { return }
-        if pointer?.ownerPeerID == id { broadcast("control") };
+        if claimControl, pointer?.ownerPeerID == id { broadcast("control") };
         event(
             "InputMode bluetoothOnly=\(manager.bluetoothInputOnly) bleWindow=adaptive-max16 maxPendingAgeMs=80 coalesceMs=2 render=immediate"
         );
@@ -550,7 +553,11 @@ import Foundation
                 physicalFunctionSlots.removeValue(forKey: key);
                 if active?.peerID == id, keys[id]?.contains(key) == true { try? setKey(id, key, false) }
             }
-            if input.type == "keyDown", key == "Escape", has("Control"), has("Alt"), has("Shift") {
+            if input.type == "keyDown", key == "Escape",
+                SharingShortcut.isEmergencyChord(physicalKeys, platform: platform)
+                    || SharingShortcut.isEmergencyChord(
+                        Set(physicalKeys.map { sourceKey($0, screen.peerID) }), platform: platform)
+            {
                 pause();
                 status("已紧急恢复本机输入");
                 return true
@@ -692,7 +699,6 @@ import Foundation
         next.deltaY = max(-10000, min(10000, a.deltaY + b.deltaY));
         return next
     }
-    private func has(_ prefix: String) -> Bool { physicalKeys.contains { $0.hasPrefix(prefix) } }
     private func sourceKey(_ key: String, _ target: String) -> String {
         sourceKeyTransform?(key, target == id ? platform : platforms[target, default: "unknown"]) ?? key
     }
@@ -927,7 +933,9 @@ import Foundation
         if message.type == "release" {
             received[peer] = max(received[peer, default: 0], message.sequence);
             releasePeer(peer);
-            if pointer?.ownerPeerID == peer || active?.peerID == peer { recover("对端已停止输入共享，本机已恢复", announce: false) };
+            if pointer?.ownerPeerID == peer || active?.peerID == peer {
+                recover("对端已停止输入共享，本机已恢复", announce: false, reposition: active?.peerID != id)
+            };
             return
         }
         if message.type == "priority", peer == group.leaderID, let list = message.priority,

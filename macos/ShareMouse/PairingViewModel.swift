@@ -4,7 +4,10 @@ import Network
 import SwiftUI
 
 @MainActor final class PairingViewModel: ObservableObject {
-    private let sharingShortcut = SharingShortcut()
+    private let sharingShortcut = SharingShortcut(platform: "macos")
+    private let sessionMonitor = MacSessionMonitor()
+    private var availabilityBlocked = false
+    private var resumeWithoutClaim = false
     let firstRun: Bool
     let preferences: LocalPreferences
     private let notifications: NotificationService
@@ -117,7 +120,6 @@ import SwiftUI
     @Published var layoutError = ""
     @Published var nativeLayoutError = ""
     @Published var clipboardStatus = "等待复制 · 正文按粘贴请求"
-    private var cutting = false
     @Published var historyEntries: [HistoryEntry] = []
     @Published var historyStatus = "历史只保存在本机"
     var historyVisibleCount: Int { history?.visibleCount ?? 5 }
@@ -342,6 +344,7 @@ import SwiftUI
             Task {
                 guard let self else { return };
                 defer { if self.preparingLocalFiles?.version == version { self.preparingLocalFiles = nil } };
+                guard !self.stopping, NSPasteboard.general.changeCount == version else { return }
                 do {
                     guard let files = self.files else {
                         try await self.clipboard?.publishContent(nil);
@@ -389,9 +392,14 @@ import SwiftUI
                 } catch { self.clipboardStatus = "系统拒绝粘贴，请检查辅助功能权限" }
             }
         }
-        inputAdapter.captured = { [weak self, weak input] event in
+        inputAdapter.captured = { [weak self, weak input, weak inputAdapter] event in
             if self?.computer?.physicalInput(event) == true { return false }
-            if self?.computer?.controlling != true, self?.sharingShortcut.capture(event) == true { return true }
+            if self?.computer?.controlling != true,
+                self?.sharingShortcut.capture(event, sourceKey: { inputAdapter?.sourceKey($0, to: "windows") ?? $0 })
+                    == true
+            {
+                return true
+            }
             if self?.historyPopup.capture(event) == true { return true }
             if self?.history?.capture(event) == true { return true }
 
@@ -531,8 +539,12 @@ import SwiftUI
                 restore: { resume in
                     self.resumePreservingUserCursor = self.computerAdapter.independent
                     self.computerAdapter.stop()
-                    guard !self.stopping, self.computerInputPauseRevision == self.inputPauseRevision else { return }
-                    self.automaticInputPending = self.automaticInputPending || resume;
+                    guard !self.stopping else { return }
+                    if self.computerInputPauseRevision == self.inputPauseRevision {
+                        self.automaticInputPending = self.automaticInputPending || resume
+                    }
+                    // A lid/lock transition may have queued its own passive resume
+                    // while MCP still owned input. Manual pause remains guarded by intent.
                     self.startAutomaticInput()
                 },
                 canControl: {
@@ -557,6 +569,8 @@ import SwiftUI
             await computer.start();
             configureMCP()
             if preferences.renderer == "native" { configureNotifications() }
+            sessionMonitor.changed = { [weak self] in self?.updateInputAvailability() }
+            sessionMonitor.start()
             refreshPermissions()
             if needsInputPermissions {
                 Task {
@@ -813,6 +827,7 @@ import SwiftUI
         }
     }
     func reconnectInput() {
+        resumeWithoutClaim = false
         sharingRequested = true;
         automaticInputPending = true;
         enableInput(resumePeers: true)
@@ -1039,6 +1054,7 @@ import SwiftUI
     private var stopping = false
     func stop() {
         stopping = true
+        sessionMonitor.stop()
         mcp?.stop();
         computer?.stop();
         computerAdapter.stop()
@@ -1065,7 +1081,9 @@ import SwiftUI
     }
     private func needsSharedPaste() -> Bool {
         let version = NSPasteboard.general.changeCount
-        if localCutVersion == version { return true }
+        // A locally cut file only needs the Finder move adaptation. Other apps
+        // must retain their own paste behavior (text fields, editor file drops, etc.).
+        if localCutVersion == version { return FinderFiles.frontmost }
         if clipboardAdapter.hasUnobservedChange
             || preparingLocalFiles?.version == version && preparingLocalFiles?.previousEntryID == clipboard?.current?.id
         {
@@ -1092,12 +1110,17 @@ import SwiftUI
             return true
         }
         guard let clipboard, let inputAdapter else { return false }
-        if command == "paste", localCutVersion == NSPasteboard.general.changeCount, FinderFiles.canCut,
-            groupState == nil || clipboard.current?.sourcePeerID == peer.id.value.uuidString.lowercased(),
-            expectedEntryID == nil || expectedEntryID == clipboard.current?.id
-        {
-            localCutVersion = nil
+        if command == "paste", localCutVersion == NSPasteboard.general.changeCount {
+            // The system pasteboard version proves this is our local Cut even
+            // while the file manifest is still being prepared for other peers.
+            if let expectedEntryID {
+                guard expectedEntryID == clipboard.current?.id,
+                    clipboard.current?.sourcePeerID == peer.id.value.uuidString.lowercased()
+                else { throw ClipboardError.changed }
+            }
+            guard FinderFiles.canCut else { return false }
             try inputAdapter.inject(CapturedInput("command", command: "moveFiles"), screen: nil, x: 0, y: 0)
+            localCutVersion = nil
             return true
         }
         if command == "paste" {
@@ -1159,6 +1182,9 @@ import SwiftUI
         return false
     }
     private func captureSelectedCut() -> Bool {
+        // Native editors own Command+X, including application-specific empty
+        // selections, rich text and multi-cursor cuts. Only Finder needs emulation.
+        guard FinderFiles.frontmost else { return false }
         let application = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let screenID = input?.pointer?.screenID
         // Consume only X; let the modifier pass normally, and query AX outside the native tap callback.
@@ -1172,23 +1198,20 @@ import SwiftUI
         return true
     }
     private func cutSelectedContent() async throws -> Bool {
-        guard !cutting, !stopping, let application = NSWorkspace.shared.frontmostApplication, let inputAdapter else {
+        guard !stopping, let application = NSWorkspace.shared.frontmostApplication, let inputAdapter else {
             return true
         }
-        cutting = true;
-        defer { cutting = false }
-        let selection = MacCutSelection.content(in: application)
+        let fileSelection = FinderFiles.canCut
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == application.processIdentifier else {
             return true
         }
-        switch selection {
-        case .none: clipboardStatus = "未选中文本，未执行剪切"
-        case .unavailable: clipboardStatus = "无法确认选中内容，未执行剪切"
-        case .text:
+        if !fileSelection {
+            // Remote Ctrl+X and Finder's editable fields use native Command+X;
+            // AX selection availability must never veto an application's Cut.
             try inputAdapter.inject(CapturedInput("command", command: "cut"), screen: nil, x: 0, y: 0)
             try? await Task.sleep(for: .milliseconds(80));
             await clipboardAdapter.poll()
-        case .files:
+        } else {
             let paths = FinderFiles.selection()
             guard !paths.isEmpty,
                 NSWorkspace.shared.frontmostApplication?.processIdentifier == application.processIdentifier
@@ -1198,6 +1221,8 @@ import SwiftUI
                 let version = NSPasteboard.general.changeCount;
                 localCutVersion = version
                 if groupState != nil {
+                    preparingLocalFiles = (version, clipboard?.current?.id)
+                    defer { if preparingLocalFiles?.version == version { preparingLocalFiles = nil } }
                     try await files?.copy(
                         paths, cut: true, stillCurrent: { NSPasteboard.general.changeCount == version })
                 }
@@ -1246,6 +1271,7 @@ import SwiftUI
         if action == "open" { NSWorkspace.shared.open(URL(fileURLWithPath: task.destination)) }
     }
     func refreshPermissions() {
+        sessionMonitor.refresh()
         let post = CGPreflightPostEventAccess();
         let listen = CGPreflightListenEventAccess()
         let bluetooth: String
@@ -1352,8 +1378,8 @@ import SwiftUI
     }
     func enableInput(resumePeers: Bool = false) {
         peerResumePending = peerResumePending || resumePeers
-        guard throughputTesting.isEmpty, computer?.controlling != true, pendingConnectionDialogs == 0, !inputStarting,
-            let input, let inputAdapter
+        guard !availabilityBlocked, throughputTesting.isEmpty, computer?.controlling != true,
+            pendingConnectionDialogs == 0, !inputStarting, let input, let inputAdapter
         else { return };
         inputStarting = true
         let revision = inputPauseRevision
@@ -1362,7 +1388,7 @@ import SwiftUI
                 inputStarting = false;
                 inputEnabled = input.enabled
             }
-            guard !stopping, revision == inputPauseRevision else { return }
+            guard !stopping, !availabilityBlocked, revision == inputPauseRevision else { return }
             guard throughputTesting.isEmpty, computer?.controlling != true, pendingConnectionDialogs == 0 else {
                 // A controller or dialog can take over after this task was queued.
                 automaticInputPending = true;
@@ -1372,8 +1398,10 @@ import SwiftUI
                 try inputAdapter.start();
                 if !input.enabled {
                     try await input.enable(
-                        preservingLocalCursor: resumePreservingUserCursor ? currentLocalCursor() : nil);
+                        preservingLocalCursor: resumePreservingUserCursor ? currentLocalCursor() : nil,
+                        claimControl: !resumeWithoutClaim);
                     resumePreservingUserCursor = false
+                    resumeWithoutClaim = false
                 }
                 if stopping || revision != inputPauseRevision || computer?.controlling == true {
                     input.pause()
@@ -1428,6 +1456,7 @@ import SwiftUI
         notifications.toast(enabled ? "鼠标穿屏已开启" : "鼠标穿屏已关闭", enabled ? "可以跨越相邻屏幕" : "停留在当前电脑；远端键鼠继续工作")
     }
     func pauseInput() {
+        resumeWithoutClaim = false
         sharingRequested = false;
         inputPauseRevision += 1;
         automaticInputPending = false;
@@ -1435,6 +1464,40 @@ import SwiftUI
         input?.pause();
         inputEnabled = false;
         inputStatus = "键鼠共享已暂停，本机输入已恢复"
+    }
+    func setAutomaticRelease(lid: Bool? = nil, lock: Bool? = nil) {
+        if let lid { preferences.releaseOnLidClose = lid }
+        if let lock { preferences.releaseOnLock = lock }
+        preferences.save()
+        objectWillChange.send()
+        updateInputAvailability()
+    }
+    private func updateInputAvailability() {
+        let blocked =
+            preferences.releaseOnLidClose && sessionMonitor.lidClosed == true
+            || preferences.releaseOnLock && sessionMonitor.screenLocked
+        guard !stopping, blocked != availabilityBlocked else { return }
+        availabilityBlocked = blocked
+        if blocked {
+            inputPauseRevision += 1
+            automaticInputPending = sharingRequested
+            sharingShortcut.reset();
+            clipboardShortcut.reset();
+            history?.resetCapture()
+            input?.pause();
+            inputEnabled = false
+            inputStatus = "合盖／锁屏，键鼠共享暂时释放；开盖并解锁后自动恢复"
+            log(
+                .info,
+                "InputAvailabilitySuspended lid=\(sessionMonitor.lidClosed == true) locked=\(sessionMonitor.screenLocked)"
+            )
+        } else if sharingRequested {
+            automaticInputPending = true
+            resumePreservingUserCursor = true
+            resumeWithoutClaim = true
+            log(.info, "InputAvailabilityRestored")
+            startAutomaticInput()
+        }
     }
     func exitMCPControl() { computer?.endControl(reason: "user_exit") }
     private var mcpServing = false
@@ -1504,9 +1567,9 @@ import SwiftUI
         }
     }
     private func startAutomaticInput() {
-        guard !stopping, throughputTesting.isEmpty, sharingRequested, computer?.controlling != true,
-            automaticInputPending, !connectionPromptOpen, pendingConnectionDialogs == 0, !inputStarting,
-            input?.enabled != true, groupOnline.count > 1, inputAdapter?.canCapture == true,
+        guard !stopping, !availabilityBlocked, throughputTesting.isEmpty, sharingRequested,
+            computer?.controlling != true, automaticInputPending, !connectionPromptOpen, pendingConnectionDialogs == 0,
+            !inputStarting, input?.enabled != true, groupOnline.count > 1, inputAdapter?.canCapture == true,
             inputAdapter?.canInject == true
         else { return }
         automaticInputPending = false;

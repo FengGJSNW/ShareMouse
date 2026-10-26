@@ -14,7 +14,9 @@ if (args.Length >= 1 && args[0] == ShareMouse.WindowsClipboardReader.HelperArgum
     }));
     return;
 }
+if (args.Contains("--tcp-write-timeout-regression")) { await SharingRegression.CheckTcpWriteTimeout(); return; }
 if (args.Contains("--function-row-regression")) { FunctionRowRegression.Run(); return; }
+if (args.Contains("--availability-regression")) { await SharingRegression.CheckAvailability(); return; }
 if (args.Contains("--ble-context-regression")) { await SharingRegression.CheckBleTransportContext(); return; }
 if (args.Contains("--input-ack-route-regression")) { await SharingRegression.CheckInputAckRoute(); return; }
 if (args.Contains("--input-stall-regression")) { await SharingRegression.CheckInputStall(); return; }

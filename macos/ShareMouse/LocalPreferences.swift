@@ -25,6 +25,8 @@ import SwiftUI
         var fnEnabled: Bool?;
         var functionKeysEnabled: Bool?;
         var screenCrossingEnabled: Bool?
+        var releaseOnLidClose: Bool?
+        var releaseOnLock: Bool?
     }
     private let file: URL
     @Published var renderer = "custom"
@@ -45,6 +47,8 @@ import SwiftUI
     var fnEnabled = true
     var functionKeysEnabled = true
     var screenCrossingEnabled = true
+    var releaseOnLidClose = true
+    var releaseOnLock = true
     var bluetoothInputOnly = false
     @Published var gameMouseMode = "auto"
     var networkAvailable = true
@@ -66,6 +70,8 @@ import SwiftUI
                 fnEnabled = saved.fnEnabled ?? true;
                 functionKeysEnabled = saved.functionKeysEnabled ?? true;
                 screenCrossingEnabled = saved.screenCrossingEnabled ?? true;
+                releaseOnLidClose = saved.releaseOnLidClose ?? true;
+                releaseOnLock = saved.releaseOnLock ?? true;
                 renderer = saved.renderer;
                 corner = saved.corner;
                 logLevel = saved.logLevel;
@@ -102,7 +108,8 @@ import SwiftUI
                     pointerSensitivity: pointerSensitivity, reverseScrollHorizontal: reverseScrollHorizontal,
                     reverseScrollVertical: reverseScrollVertical, horizontalScrollAngle: horizontalScrollAngle,
                     fnEnabled: fnEnabled, functionKeysEnabled: functionKeysEnabled,
-                    screenCrossingEnabled: screenCrossingEnabled)
+                    screenCrossingEnabled: screenCrossingEnabled, releaseOnLidClose: releaseOnLidClose,
+                    releaseOnLock: releaseOnLock)
             ).write(to: file, options: .atomic)
         } catch { status = "无法保存本机设置" }
     }

@@ -29,7 +29,7 @@ internal static class WindowsInputStatus
             processName = process.ProcessName;
         }
         catch (Exception ex) when (ex is ArgumentException or System.ComponentModel.Win32Exception or InvalidOperationException) { }
-        return ComputerUseService.Obj(("controller_integrity", Level(controller)), ("foreground_integrity", Level(target)),
+        return ComputerUseService.Obj(("controller_integrity", Level(controller)), ("controller_trustedinstaller", WindowsPrivilegeSession.IsTrustedInstaller), ("profile_user", WindowsPrivilegeSession.UserName), ("foreground_integrity", Level(target)),
             ("input_injection_blocked", controller >= 0 && target > controller),
             ("foreground_window", ComputerUseService.Obj(("window_id", window == IntPtr.Zero ? null : "win:" + processId + ":" + window.ToInt64().ToString("X")), ("process_id", processId), ("process_name", processName), ("title", title.ToString()), ("left", bounds.Left), ("top", bounds.Top), ("right", bounds.Right), ("bottom", bounds.Bottom))),
             ("cursor_position", ComputerUseService.Obj(("x", cursor.X), ("y", cursor.Y), ("coordinate_space", "desktop_pixels"))));

@@ -9,7 +9,7 @@ namespace ShareMouse;
 
 public sealed class LocalPreferences
 {
-    private sealed record Saved(string Renderer, string Corner, string LogLevel, bool OnboardingComplete, bool? NetworkAvailable = null, bool? BluetoothAvailable = null, bool? McpEnabled = null, bool? AllowComputerUse = null, bool? AllowMcpFiles = null, bool? ComputerCursorHints = null, bool? BluetoothInputOnly = null, string? McpToastStyle = null, string? GameMouseMode = null, bool? LogEnabled = null, Dictionary<string, double>? PointerSensitivity = null, bool? FnEnabled = null, bool? FunctionKeysEnabled = null, bool? ScreenCrossingEnabled = null, Dictionary<string, bool>? ReverseScrollHorizontal = null, Dictionary<string, bool>? ReverseScrollVertical = null, Dictionary<string, double>? HorizontalScrollAngle = null);
+    private sealed record Saved(string Renderer, string Corner, string LogLevel, bool OnboardingComplete, bool? NetworkAvailable = null, bool? BluetoothAvailable = null, bool? McpEnabled = null, bool? AllowComputerUse = null, bool? AllowMcpFiles = null, bool? ComputerCursorHints = null, bool? BluetoothInputOnly = null, string? McpToastStyle = null, string? GameMouseMode = null, bool? LogEnabled = null, Dictionary<string, double>? PointerSensitivity = null, bool? FnEnabled = null, bool? FunctionKeysEnabled = null, bool? ScreenCrossingEnabled = null, Dictionary<string, bool>? ReverseScrollHorizontal = null, Dictionary<string, bool>? ReverseScrollVertical = null, Dictionary<string, double>? HorizontalScrollAngle = null, bool? ReleaseOnLidClose = null, bool? ReleaseOnLock = null);
     private readonly string file;
     public string Renderer { get; set; } = "custom";
     public string Corner { get; set; } = "bottomRight";
@@ -21,6 +21,8 @@ public sealed class LocalPreferences
     public bool FnEnabled { get; set; } = true;
     public bool FunctionKeysEnabled { get; set; } = true;
     public bool ScreenCrossingEnabled { get; set; } = true;
+    public bool ReleaseOnLidClose { get; set; } = true;
+    public bool ReleaseOnLock { get; set; } = true;
     public bool LogEnabled { get; set; } = true;
     public bool NetworkAvailable { get; set; } = true;
     public bool BluetoothInputOnly
@@ -64,6 +66,8 @@ public sealed class LocalPreferences
                     FnEnabled = saved.FnEnabled ?? true;
                     FunctionKeysEnabled = saved.FunctionKeysEnabled ?? true;
                     ScreenCrossingEnabled = saved.ScreenCrossingEnabled ?? true;
+                    ReleaseOnLidClose = saved.ReleaseOnLidClose ?? true;
+                    ReleaseOnLock = saved.ReleaseOnLock ?? true;
                     Renderer = saved.Renderer;
                     Corner = saved.Corner;
                     LogLevel = saved.LogLevel;
@@ -93,7 +97,7 @@ public sealed class LocalPreferences
     {
         try
         {
-            File.WriteAllText(file + ".tmp", JsonSerializer.Serialize(new Saved(Renderer, Corner, LogLevel, OnboardingComplete, NetworkAvailable, BluetoothAvailable, McpEnabled, AllowComputerUse, AllowMcpFiles, ComputerCursorHints, BluetoothInputOnly, McpToastStyle, GameMouseMode, LogEnabled, PointerSensitivity, FnEnabled, FunctionKeysEnabled, ScreenCrossingEnabled, ReverseScrollHorizontal, ReverseScrollVertical, HorizontalScrollAngle)));
+            File.WriteAllText(file + ".tmp", JsonSerializer.Serialize(new Saved(Renderer, Corner, LogLevel, OnboardingComplete, NetworkAvailable, BluetoothAvailable, McpEnabled, AllowComputerUse, AllowMcpFiles, ComputerCursorHints, BluetoothInputOnly, McpToastStyle, GameMouseMode, LogEnabled, PointerSensitivity, FnEnabled, FunctionKeysEnabled, ScreenCrossingEnabled, ReverseScrollHorizontal, ReverseScrollVertical, HorizontalScrollAngle, ReleaseOnLidClose, ReleaseOnLock)));
             File.Move(file + ".tmp", file, true);
         }
         catch { Status = "无法保存本机设置"; }
@@ -131,7 +135,7 @@ public sealed class LocalPreferences
             {
                 if (!WindowsInputStatus.IsElevated)
                     throw new UnauthorizedAccessException("Administrator consent is required.");
-                var account = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                var account = WindowsPrivilegeSession.UserName;
                 dynamic task = service.NewTask(0);
                 task.RegistrationInfo.Description = "ShareMouse 登录启动；使用已授权的管理员权限，可在软件设置取消。";
                 task.Principal.UserId = account;

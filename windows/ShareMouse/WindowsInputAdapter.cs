@@ -72,7 +72,8 @@ public sealed class WindowsInputAdapter : IDisposable
         functions.SetKeyboardPaths(rawFunctions.AsusFeaturePaths);
         diagnostic("FunctionKeyboardProfile profile=" + (rawFunctions.HasAsusFunctionKeyboard ? "asus-0b05-19b6" : "unknown"));
         // Recover the configured scheme if a previous run left replaced cursors behind.
-        if (!SystemParametersInfoW(0x57, 0, IntPtr.Zero, 0))
+        // Reloading as SYSTEM replaces the interactive user's custom cursor scheme.
+        if (!WindowsPrivilegeSession.IsTrustedInstaller && !SystemParametersInfoW(0x57, 0, IntPtr.Zero, 0))
             throw new Win32Exception(Marshal.GetLastWin32Error());
         if (cursorCover is null)
         {

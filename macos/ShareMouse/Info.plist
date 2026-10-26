@@ -5,11 +5,12 @@
 <key>CFBundleDisplayName</key><string>ShareMouse</string>
 <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
 <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+<key>CFBundleIconFile</key><string>ShareMouse.icns</string>
 <key>CFBundleName</key><string>ShareMouse</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>CFBundleVersion</key><string>26</string>
-<key>ShareMouseDistributionVersion</key><string>v0.1.0-alpha.2</string>
+<key>CFBundleVersion</key><string>37</string>
+<key>ShareMouseDistributionVersion</key><string>v0.1.0-alpha.3</string>
 <key>LSMinimumSystemVersion</key><string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSBluetoothAlwaysUsageDescription</key><string>ShareMouse 使用蓝牙发现你允许协作的电脑，并在身份验证后传输加密键鼠、剪贴板和文件数据。蓝牙为可选功能。</string>

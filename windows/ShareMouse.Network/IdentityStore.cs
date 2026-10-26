@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using ShareMouse.Core;
+using Microsoft.Win32.SafeHandles;
+using System.Security.Principal;
 
 namespace ShareMouse.Network;
 
@@ -15,8 +17,21 @@ public sealed class IdentityStore : IDisposable
         get;
     }
 
-    public IdentityStore(string peerId)
+    private readonly SafeAccessTokenHandle? credentialUser;
+    internal Task AuthenticateAsync(Func<Task> action) => credentialUser is null ? action() : WindowsIdentity.RunImpersonatedAsync(credentialUser, action);
+    internal Task<T> AuthenticateAsync<T>(Func<Task<T>> action) => credentialUser is null ? action() : WindowsIdentity.RunImpersonatedAsync(credentialUser, action);
+
+    public IdentityStore(string peerId, X509Certificate2? preparedCertificate = null, SafeAccessTokenHandle? credentialUser = null)
     {
+        this.credentialUser = credentialUser;
+        if (preparedCertificate is not null)
+        {
+            Certificate = preparedCertificate;
+            Identity = Describe(Certificate);
+            if (!Certificate.HasPrivateKey || Identity.PeerID != peerId)
+                throw new CryptographicException("Prepared identity mismatch.");
+            return;
+        }
         using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadWrite);
         var subject = "CN=ShareMouse-" + peerId;

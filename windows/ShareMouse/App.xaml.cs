@@ -15,10 +15,11 @@ public partial class App : Application
     private Mutex? instance;
     private bool ownsInstance;
     private Forms.NotifyIcon? tray;
+    private System.Drawing.Icon? trayIcon;
     private AppLogger? logger;
     private LocalPreferences? preferences;
     private PairingController? pairing;
-    private readonly string dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShareMouse");
+    private string dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShareMouse");
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -45,6 +46,18 @@ public partial class App : Application
         if (e.Args.Length == 2 && e.Args[0] == "--mcp-inspect")
         {
             _ = InspectAndExit(e.Args[1]);
+            return;
+        }
+        try
+        {
+            WindowsPrivilegeSession.Initialize(e.Args);
+            dataDirectory = WindowsPrivilegeSession.DataDirectory;
+        }
+        catch (Exception ex)
+        {
+            if (!WindowsPrivilegeSession.ReportInitializationFailure(ex))
+                MessageBox.Show("TrustedInstaller 重启未完成：" + ex.Message, "ShareMouse");
+            Shutdown();
             return;
         }
         var restart = e.Args.FirstOrDefault(a => a.StartsWith("--restart-after=", StringComparison.Ordinal));
@@ -101,9 +114,11 @@ public partial class App : Application
         menu.Items.Add("打开日志目录", null, (_, _) => OpenLogs());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出 ShareMouse", null, (_, _) => Shutdown());
+        using (var iconStream = GetResourceStream(new Uri("pack://application:,,,/ShareMouse.ico")).Stream)
+            trayIcon = new System.Drawing.Icon(iconStream, new System.Drawing.Size(32, 32));
         tray = new Forms.NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = trayIcon,
             Text = "ShareMouse",
             Visible = true,
             ContextMenuStrip = menu
@@ -161,10 +176,12 @@ public partial class App : Application
         pairing?.Dispose();
         Record(LogLevel.Info, "ApplicationStopped");
         tray?.Dispose();
+        trayIcon?.Dispose();
         logger?.Dispose();
         if (ownsInstance)
             instance?.ReleaseMutex();
         instance?.Dispose();
+        WindowsPrivilegeSession.Dispose();
         base.OnExit(e);
     }
 }

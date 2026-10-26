@@ -272,6 +272,17 @@ private struct PairingPanel: View {
                             Button("断开") { model.pauseInput() };
                             Button("重连") { model.reconnectInput() }
                         }
+                        Toggle(
+                            "合盖释放键鼠",
+                            isOn: Binding(
+                                get: { model.preferences.releaseOnLidClose },
+                                set: { model.setAutomaticRelease(lid: $0) }))
+                        Toggle(
+                            "锁屏释放键鼠",
+                            isOn: Binding(
+                                get: { model.preferences.releaseOnLock }, set: { model.setAutomaticRelease(lock: $0) }))
+                        Text("暂时释放本机键鼠共享，其他电脑继续使用；开盖／解锁后自动恢复。手动断开不会自动恢复，配对和文件连接保留。").font(.caption).foregroundStyle(
+                            .secondary)
                         Picker(
                             "本机游戏鼠标",
                             selection: Binding(
@@ -297,8 +308,9 @@ private struct PairingPanel: View {
                         }.pickerStyle(.segmented)
                         Text("所选链路为偏好；不可用时立即回退，延迟明显偏高时在操作间隙选择更快链路。文件和 MCP 优先网络。").font(.caption).foregroundStyle(
                             .secondary)
-                        Text("保留配对和文件连接。Control+Option+Shift+Esc 暂停／恢复键鼠共享，长按只切换一次；任意一端重连即可恢复共享。").font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            "保留配对和文件连接。Command+Control+Shift+Esc 暂停／恢复键鼠共享（也支持 Control+Option+Shift+Esc），长按只切换一次；任意一端重连即可恢复共享。"
+                        ).font(.caption).foregroundStyle(.secondary)
                     }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 GroupBox("远端行为设置") {

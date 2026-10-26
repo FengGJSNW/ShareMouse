@@ -11,6 +11,97 @@ using ShareMouse.Network;
 
 static class SharingRegression
 {
+    public static async Task CheckAvailability()
+    {
+        await using var a = new Fixture("AvailabilityController", id: "0000" + Guid.NewGuid().ToString("D")[4..]);
+        await using var b = new Fixture("AvailabilityTarget", id: "ffff" + Guid.NewGuid().ToString("D")[4..]);
+        a.Group.Start();
+        b.Group.Start();
+        a.Manager.Start(a.Port);
+        b.Manager.Start(b.Port);
+        await a.Manager.ConnectAsync("127.0.0.1", b.Port, "123456", "fixture-secret");
+        await Wait(() => a.Group.Online.Length == 2 && b.Group.Online.Length == 2 && a.Group.Active?.Id == b.Group.Active?.Id);
+        using var context = new FixtureInputContext();
+        context.Invoke(() =>
+        {
+            using var history = new HistoryService(a.Id, a.Directory, a.Manager, context);
+            var opened = 0;
+            history.Opened = () => opened++;
+            history.Capture(new("keyDown", "MetaLeft")); // Win+L can lose its release on the locked desktop.
+            history.ResetCapture();
+            history.Capture(new("keyDown", "ControlLeft"));
+            history.Capture(new("keyDown", "AltLeft"));
+            Require(history.Capture(new("keyDown", "KeyV")) && opened == 1, "Lock cleanup left a remembered Win modifier");
+            history.ResetCapture();
+            Require(!history.Capture(new("keyUp", "KeyV")), "Lock cleanup left a consumed shortcut");
+            return true;
+        });
+        var group = a.Group.Active!;
+        var keys = new HashSet<string>();
+        var buttons = new HashSet<int>();
+        var sourceMoves = 0;
+        var source = context.Invoke(() => new InputService(a.Id, "macos", a.Manager, context,
+            (e, _, _, _) => { if (e.Type == "move") sourceMoves++; }, (_, _) => { }, _ => { }));
+        var target = context.Invoke(() => new InputService(b.Id, "windows", b.Manager, context,
+            (e, _, _, _) =>
+            {
+                if (e.Key is { } key)
+                {
+                    if (e.Type == "keyDown")
+                        keys.Add(key);
+                    if (e.Type == "keyUp")
+                        keys.Remove(key);
+                }
+                if (e.Type == "buttonDown")
+                    buttons.Add(e.Button);
+                if (e.Type == "buttonUp")
+                    buttons.Remove(e.Button);
+            }, (_, _) => { }, _ => { }));
+        bool Sync() => context.Invoke(() =>
+        {
+            var x = a.Manager.CurrentSessions();
+            var y = b.Manager.CurrentSessions();
+            source.Update(group, [a.Id, b.Id], x);
+            target.Update(group, [a.Id, b.Id], y);
+            return x.Any(s => s.Capabilities.Contains("input")) && y.Any(s => s.Capabilities.Contains("input"));
+        });
+        try
+        {
+            Sync();
+            await context.Invoke(() => source.Enable());
+            await context.Invoke(() => target.Enable());
+            await Wait(Sync);
+            await Wait(() => context.Invoke(() => source.Pointer is not null && source.Pointer == target.Pointer));
+            await context.Invoke(() => source.Enable());
+            await Wait(() => context.Invoke(() => source.Pointer == target.Pointer && source.Pointer?.OwnerPeerID == a.Id));
+            var local = group.Layout.First(s => s.PeerID == a.Id);
+            var remote = group.Layout.First(s => s.PeerID == b.Id);
+            var dx = remote.X > local.X ? 8 : -8;
+            context.Invoke(() =>
+            {
+                source.Capture(new("move", DeltaX: dx, ScreenID: local.Id, X: dx > 0 ? 1 : 0, Y: .5));
+                source.Capture(new("keyDown", "Fn"));
+                source.Capture(new("buttonDown", Button: 0));
+                return true;
+            });
+            await Wait(() => context.Invoke(() => keys.Count > 0 && buttons.Contains(0)));
+            context.Invoke(() => { target.Pause(); return true; });
+            await Wait(() => { Sync(); return context.Invoke(() => keys.Count == 0 && buttons.Count == 0 && source.Pointer?.ScreenID == local.Id); });
+            await Wait(() => !a.Manager.CurrentSessions().Any(s => s.Capabilities.Contains("input")));
+            Sync();
+            context.Invoke(() => source.Capture(new("move", DeltaX: dx, ScreenID: local.Id, X: dx > 0 ? 1 : 0, Y: .5)));
+            Require(context.Invoke(() => source.Enabled && source.Pointer?.ScreenID == local.Id), "Unavailable target trapped input");
+            var before = context.Invoke(() => source.Pointer);
+            var moves = context.Invoke(() => sourceMoves);
+            await context.Invoke(() => target.Enable(claimControl: false));
+            await Wait(Sync);
+            await Wait(() => context.Invoke(() => source.Pointer == target.Pointer));
+            Require(context.Invoke(() => source.Pointer == before && sourceMoves == moves), "Automatic rejoin stole or warped the current pointer");
+            Require(a.Manager.CurrentSessions().Length == 1, "Input release replaced the authenticated session");
+            Console.WriteLine("PASS: lid/lock input pause releases keys/buttons, excludes the target, and passively rejoins without pointer takeover. No OS input injected.");
+        }
+        finally { context.Invoke(() => { source.Dispose(); target.Dispose(); return true; }); }
+    }
     public static async Task CheckInputStall()
     {
         await using var a = new Fixture("SlowInputA");
@@ -720,12 +811,71 @@ static class SharingRegression
         CheckWireVector();
         Console.WriteLine("PASS: automatic desktop, existing desktop reconciliation, saved layout reconnect, connection confirmation, local input passthrough, coalesced motion, ordered critical input 512 concurrent encrypted frames, bounded compact input, drag release, temporary recovery, known-device reconnect, 10-second RTT probes, uninterrupted motion past half-second snapshots, slow-link isolation, metadata filtering and cross-platform wire vector");
     }
+    public static async Task CheckTcpWriteTimeout()
+    {
+        await using var a = new Fixture("WriteTimeoutA");
+        await using var b = new Fixture("WriteTimeoutB");
+        a.Manager.Start(a.Port);
+        b.Manager.Start(b.Port);
+        await a.Manager.ConnectAsync("127.0.0.1", b.Port, "123456", "fixture-secret");
+        var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var sessions = typeof(SessionManager).GetField("sessions", flags)!.GetValue(a.Manager)!;
+        object?[] arguments = [b.Id, null];
+        sessions.GetType().GetMethod("TryGetValue")!.Invoke(sessions, arguments);
+        var links = (ConcurrentDictionary<string, ISessionTransport>)arguments[1]!.GetType().GetProperty("Links")!.GetValue(arguments[1])!;
+        var tcp = (SecureTcp)links["tcp"];
+        var gate = (SemaphoreSlim)typeof(SecureTcp).GetField("sendGate", flags)!.GetValue(tcp)!;
+        await gate.WaitAsync();
+        try
+        {
+            var began = System.Diagnostics.Stopwatch.StartNew();
+            var write = a.Manager.SendAsync(b.Id, "files", [1]);
+            var cancelled = false;
+            try { await write.WaitAsync(TimeSpan.FromSeconds(13)); }
+            catch (OperationCanceledException) { cancelled = true; }
+            Require(cancelled, "A blocked background TCP write had no deadline");
+            Require(began.Elapsed.TotalSeconds is >= 9 and < 13, "Unexpected TCP write deadline");
+            await Wait(() => a.Manager.CurrentSessions().Length == 0 && b.Manager.CurrentSessions().Length == 0);
+            Console.WriteLine("PASS: blocked TCP background write expires within 10s, aborts socket and releases both sessions");
+        }
+        finally { gate.Release(); }
+    }
     public static async Task CheckFileTransfers()
     {
+        await CheckTransferProgressRecovery();
         await CheckMetadata();
         await CheckDirectoryStagingAndConflictFinish();
         await CheckConflictApplyAll();
         Console.WriteLine("PASS: hidden Windows staging, visible final file, cleanup and encrypted file transfer/conflict completion.");
+    }
+    private static async Task CheckTransferProgressRecovery()
+    {
+        await using var fixture = new Fixture("Checkpoint");
+        using var context = new FixtureInputContext();
+        using var clipboard = new ClipboardService(fixture.Id, fixture.Manager, context, _ => { }, fixture.Directory);
+        var entry = new ClipboardEntry(Guid.NewGuid().ToString("D"), fixture.Id, 1, 1, "files", 100);
+        var item = new FileItem(Guid.NewGuid().ToString("D"), "root", "file", false, 100, 1);
+        var task = new TransferTask { Id = Guid.NewGuid().ToString("D"), Entry = entry, GroupID = "group", Destination = fixture.Directory,
+            Files = [new TransferFile { Item = item, Provider = fixture.Id, Target = "target", Partial = "partial", Received = 10 }] };
+        var file = Path.Combine(fixture.Directory, "file-transfers.json");
+        var progressFile = Path.Combine(fixture.Directory, "file-transfers-progress.json");
+        var saved = new FileTransferStore([], [], [task], ProgressGeneration: "current");
+        FileTransferService Service() => new(fixture.Id, fixture.Directory, fixture.Manager, clipboard, context, _ => { },
+            _ => Task.FromResult(false), (_, _, _) => Task.FromResult("cancel"), _ => Task.FromResult("abort"), _ => Task.FromResult(false));
+        foreach (var (generation, offset, expected) in new[] { ("current", 70L, 70L), ("old", 90L, 10L), ("current", 101L, 10L), ("current", -1L, 10L) })
+        {
+            File.WriteAllText(file, JsonSerializer.Serialize(saved, json));
+            File.WriteAllText(progressFile, JsonSerializer.Serialize(new FileProgressStore(generation,
+                new() { [task.Id] = new() { [item.Id] = offset } }), json));
+            using (var service = Service())
+                Require(service.Tasks.Single().Files.Single().Received == expected, "Invalid or stale progress checkpoint replayed");
+            using (var restarted = Service())
+                Require(restarted.Tasks.Single().Files.Single().Received == expected, "Progress replayed over a newer full commit");
+        }
+        File.WriteAllText(file, JsonSerializer.Serialize(saved with { ProgressGeneration = null }, json));
+        using (var legacy = Service())
+            Require(legacy.Tasks.Single().Files.Single().Received == 10, "Legacy store accepted unbound checkpoint");
+        Console.WriteLine("PASS: progress restart, stale generation, invalid offset and legacy-store recovery");
     }
     private static async Task Check(bool legacy)
     {

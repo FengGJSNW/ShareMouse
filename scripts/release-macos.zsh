@@ -1,8 +1,8 @@
 #!/bin/zsh
 set -eu
 task_root=${0:A:h:h}
-release_version=${1:-v0.1.0-alpha.2}
-build_number=${2:-26}
+release_version=${1:-v0.1.0-alpha.3}
+build_number=${2:-37}
 [[ "$release_version" =~ '^v?[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$' ]]
 [[ "$build_number" =~ '^[0-9]+$' ]]
 numeric_version=${release_version#v}

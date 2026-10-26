@@ -6,6 +6,254 @@ import XCTest
 @testable import ShareMouseCore
 
 final class SharingTests: XCTestCase {
+    @MainActor func testTransferProgressRecoveryRejectsStaleAndInvalidOffsets() async throws {
+        let fixture = try SharingFixture(name: "Checkpoint")
+        let clipboard = ClipboardService(
+            id: fixture.id, manager: fixture.manager, changed: { _ in }, event: { _ in }, directory: fixture.directory)
+        let entry = ClipboardEntry(
+            id: UUID().uuidString, sourcePeerID: fixture.id, counter: 1, timestamp: 1, kind: "files", byteCount: 100)
+        let item = FileItem(id: UUID().uuidString, rootID: "root", relativePath: "file", directory: false, size: 100, modified: 1)
+        let task = TransferTask(id: UUID().uuidString, entry: entry, groupID: "group", destination: fixture.directory.path)
+        task.files = [TransferFile(item: item, provider: fixture.id, target: "target", partial: "partial")]
+        task.files[0].received = 10
+        let file = fixture.directory.appendingPathComponent("file-transfers.json")
+        let progressFile = fixture.directory.appendingPathComponent("file-transfers-progress.json")
+        let saved = FileTransferStore(transactions: [], permits: [], tasks: [task], progressGeneration: "current")
+        try JSONEncoder().encode(saved).write(to: file, options: .atomic)
+        for (generation, offset, expected) in [("current", Int64(70), Int64(70)), ("old", 90, 10), ("current", 101, 10), ("current", -1, 10)] {
+            try JSONEncoder().encode(FileProgressStore(generation: generation, tasks: [task.id: [item.id: offset]]))
+                .write(to: progressFile, options: .atomic)
+            let service = try FileTransferService(
+                id: fixture.id, directory: fixture.directory, manager: fixture.manager, clipboard: clipboard,
+                changed: { _ in }, event: { _ in }, sourceChanged: { _ in false }, conflict: { _, _, _ in "cancel" },
+                partialFailure: { _ in "abort" }, deleteAll: { _ in false })
+            XCTAssertEqual(service.currentTasks.first?.files.first?.received, expected)
+            service.stop()
+            // Simulates a crash after the full store commit but before any progress cleanup.
+            let restarted = try FileTransferService(
+                id: fixture.id, directory: fixture.directory, manager: fixture.manager, clipboard: clipboard,
+                changed: { _ in }, event: { _ in }, sourceChanged: { _ in false }, conflict: { _, _, _ in "cancel" },
+                partialFailure: { _ in "abort" }, deleteAll: { _ in false })
+            XCTAssertEqual(restarted.currentTasks.first?.files.first?.received, expected)
+            restarted.stop()
+            try JSONEncoder().encode(saved).write(to: file, options: .atomic)
+        }
+        // Old stores have no generation and must not accept a leftover progress file.
+        var legacy = saved
+        legacy.progressGeneration = nil
+        try JSONEncoder().encode(legacy).write(to: file, options: .atomic)
+        let oldService = try FileTransferService(
+            id: fixture.id, directory: fixture.directory, manager: fixture.manager, clipboard: clipboard,
+            changed: { _ in }, event: { _ in }, sourceChanged: { _ in false }, conflict: { _, _, _ in "cancel" },
+            partialFailure: { _ in "abort" }, deleteAll: { _ in false })
+        XCTAssertEqual(oldService.currentTasks.first?.files.first?.received, 10)
+        oldService.stop()
+        await fixture.manager.stop()
+    }
+    func testTransferStoreEncodingBenchmarkWhenRequested() throws {
+        guard let path = ProcessInfo.processInfo.environment["SHAREMOUSE_TRANSFER_STORE_BENCHMARK"] else {
+            throw XCTSkip("Opt-in read-only benchmark of an existing transfer store")
+        }
+        let store = try JSONDecoder().decode(FileTransferStore.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        let clock = ContinuousClock()
+        var start = clock.now
+        let full = try JSONEncoder().encode(store)
+        let fullTime = start.duration(to: clock.now)
+        start = clock.now
+        let progress = FileProgressStore(generation: "benchmark", tasks: ["task": ["file": 32000]])
+        let compact = try JSONEncoder().encode(progress)
+        let progressTime = start.duration(to: clock.now)
+        print("TRANSFER_CHECKPOINT_BENCHMARK fullBytes=\(full.count) fullTime=\(fullTime) progressBytes=\(compact.count) progressTime=\(progressTime)")
+        XCTAssertLessThan(compact.count, 1024)
+    }
+    @MainActor func testUnavailableTargetReleasesInputAndRejoinsWithoutTakingPointer() async throws {
+        let a = try SharingFixture(name: "AvailableWindows", id: "0000" + UUID().uuidString.lowercased().dropFirst(4)),
+            b = try SharingFixture(name: "UnavailableMac", id: "ffff" + UUID().uuidString.lowercased().dropFirst(4))
+        var sender: InputService?, receiver: InputService?
+        do {
+            try await connect(a, b, directLAN: false)
+            try await waitFor { await self.sameDesktop(a, b) }
+            let state = await a.group.active, group = try XCTUnwrap(state)
+            var keys: Set<String> = [], buttons: Set<Int> = [], sourceMoves = 0
+            let source = InputService(
+                id: a.id, platform: "windows", manager: a.manager,
+                inject: { e, _, _, _ in if e.type == "move" { sourceMoves += 1 } }, restrict: { _, _ in },
+                status: { _ in })
+            let target = InputService(
+                id: b.id, platform: "macos", manager: b.manager,
+                inject: { e, _, _, _ in
+                    if let key = e.key {
+                        if e.type == "keyDown" { keys.insert(key) }
+                        if e.type == "keyUp" { keys.remove(key) }
+                    }
+                    if e.type == "buttonDown" { buttons.insert(e.button) }
+                    if e.type == "buttonUp" { buttons.remove(e.button) }
+                }, restrict: { _, _ in }, status: { _ in })
+            sender = source;
+            receiver = target
+            await source.start();
+            await target.start()
+            func sync() async -> Bool {
+                let x = await a.manager.currentSessions(), y = await b.manager.currentSessions()
+                source.update(group, online: [a.id, b.id], sessions: x)
+                target.update(group, online: [a.id, b.id], sessions: y)
+                return x.first?.capabilities.contains("input") == true
+                    && y.first?.capabilities.contains("input") == true
+            }
+            _ = await sync()
+            try await source.enable();
+            try await target.enable()
+            try await waitFor { await sync() }
+            try await waitFor { source.pointer != nil && source.pointer == target.pointer }
+            try await source.enable()
+            try await waitFor { source.pointer == target.pointer && source.pointer?.ownerPeerID == a.id }
+            let local = try XCTUnwrap(group.layout.first { $0.peerID == a.id }),
+                remote = try XCTUnwrap(group.layout.first { $0.peerID == b.id })
+            let right = remote.x > local.x
+            _ = source.capture(
+                CapturedInput("move", deltaX: right ? 8 : -8, screenID: local.id, x: right ? 1 : 0, y: 0.5))
+            _ = source.capture(CapturedInput("keyDown", key: "ControlLeft"))
+            _ = source.capture(CapturedInput("buttonDown", button: 0))
+            try await waitFor { !keys.isEmpty && buttons == [0] }
+            target.pause()  // The same local-only pause used by lid and session-lock transitions.
+            try await waitFor {
+                _ = await sync();
+                return keys.isEmpty && buttons.isEmpty && source.pointer?.screenID == local.id
+            }
+            XCTAssertTrue(source.enabled, "The other computer must keep its input session")
+            try await waitFor { await a.manager.currentSessions().first?.capabilities.contains("input") == false }
+            _ = source.capture(
+                CapturedInput("move", deltaX: right ? 20 : -20, screenID: local.id, x: right ? 1 : 0, y: 0.5))
+            XCTAssertEqual(source.pointer?.screenID, local.id, "Unavailable screens must not trap the pointer again")
+            let retained = source.pointer, movesBefore = sourceMoves
+            try await target.enable(claimControl: false)
+            try await waitFor { await sync() }
+            try await waitFor { target.pointer == source.pointer }
+            XCTAssertEqual(source.pointer, retained, "Automatic rejoin must not steal the active screen or owner")
+            XCTAssertEqual(sourceMoves, movesBefore, "Automatic rejoin must not warp the other computer's cursor")
+            let sessions = await a.manager.currentSessions()
+            XCTAssertEqual(sessions.count, 1)
+            source.stop();
+            target.stop();
+            await a.manager.stop();
+            await b.manager.stop()
+        } catch {
+            sender?.stop();
+            receiver?.stop();
+            await a.manager.stop();
+            await b.manager.stop();
+            throw error
+        }
+    }
+    @MainActor func testMacEmergencyChordNeverReachesWindowsAndReleasesHeldInput() async throws {
+        for swapped in [false, true] {
+            for useShortcut in [false, true] {
+                let
+                    a = try SharingFixture(
+                        name: "EmergencySource", id: "0000" + UUID().uuidString.lowercased().dropFirst(4)),
+                    b = try SharingFixture(
+                        name: "EmergencyTarget", id: "ffff" + UUID().uuidString.lowercased().dropFirst(4))
+                var sender: InputService?, receiver: InputService?
+                do {
+                    try await connect(a, b, directLAN: false)
+                    try await waitFor { await self.sameDesktop(a, b) }
+                    let state = await a.group.active
+                    let group = try XCTUnwrap(state)
+                    var keys: Set<String> = [], buttons: Set<Int> = [], escapes = 0, restricted = false, targetMoves = 0
+                    let source = InputService(
+                        id: a.id, platform: "macos", manager: a.manager, inject: { _, _, _, _ in },
+                        restrict: { remote, _ in restricted = remote }, status: { _ in })
+                    let target = InputService(
+                        id: b.id, platform: "windows", manager: b.manager,
+                        inject: { e, _, _, _ in
+                            if e.type == "move" { targetMoves += 1 }
+                            if e.key == "Escape" { escapes += 1 }
+                            if let key = e.key {
+                                if e.type == "keyDown" { keys.insert(key) }
+                                if e.type == "keyUp" { keys.remove(key) }
+                            }
+                            if e.type == "buttonDown" { buttons.insert(e.button) }
+                            if e.type == "buttonUp" { buttons.remove(e.button) }
+                        }, restrict: { _, _ in }, status: { _ in })
+                    sender = source;
+                    receiver = target
+                    source.sourceKeyTransform = { MacInputAdapter.sourceKey($0, to: $1, fnCommandSwapped: swapped) }
+                    await source.start();
+                    await target.start()
+                    source.update(group, online: [a.id, b.id], sessions: await a.manager.currentSessions())
+                    target.update(group, online: [a.id, b.id], sessions: await b.manager.currentSessions())
+                    try await source.enable();
+                    try await target.enable()
+                    try await waitFor {
+                        var x = await a.manager.currentSessions()
+                        let y = await b.manager.currentSessions()
+                        for i in x.indices { x[i].remotePlatform = "windows" }
+                        source.update(group, online: [a.id, b.id], sessions: x)
+                        target.update(group, online: [a.id, b.id], sessions: y)
+                        return x.first?.capabilities.contains("input") == true
+                            && y.first?.capabilities.contains("input") == true
+                    }
+                    try await waitFor { source.pointer != nil && source.pointer == target.pointer }
+                    try await source.enable()
+                    let local = try XCTUnwrap(group.layout.first { $0.peerID == a.id }),
+                        remote = try XCTUnwrap(group.layout.first { $0.peerID == b.id })
+                    try await waitFor { source.pointer == target.pointer && source.pointer?.ownerPeerID == a.id }
+                    let right = remote.x > local.x
+                    _ = source.capture(
+                        CapturedInput("move", deltaX: right ? 8 : -8, screenID: local.id, x: right ? 1 : 0, y: 0.5))
+                    try await waitFor { target.pointer?.screenID == remote.id }
+                    let shortcut = SharingShortcut(platform: "macos")
+                    var toggles = 0
+                    shortcut.toggle = {
+                        toggles += 1;
+                        source.pause()
+                    }
+                    func route(_ event: CapturedInput) -> Bool {
+                        if useShortcut,
+                            shortcut.capture(
+                                event,
+                                sourceKey: { MacInputAdapter.sourceKey($0, to: "windows", fnCommandSwapped: swapped) })
+                        {
+                            return true
+                        }
+                        return source.capture(event)
+                    }
+                    _ = route(CapturedInput("buttonDown", button: 0))
+                    for key in [swapped ? "Fn" : "MetaLeft", "ControlLeft", "ShiftLeft"] {
+                        XCTAssertTrue(route(CapturedInput("keyDown", key: key)))
+                    }
+                    try await waitFor { !keys.isEmpty && buttons == [0] }
+                    let movesBeforeRelease = targetMoves
+                    XCTAssertTrue(route(CapturedInput("keyDown", key: "Escape")))
+                    XCTAssertFalse(source.enabled)
+                    XCTAssertFalse(restricted, "Emergency pause must restore the local cursor")
+                    try await waitFor { keys.isEmpty && buttons.isEmpty }
+                    XCTAssertEqual(
+                        targetMoves, movesBeforeRelease,
+                        "Releasing a source must not warp a pointer already on the other computer")
+                    XCTAssertTrue(target.enabled, "Releasing one computer must not pause the other computer")
+                    if useShortcut {
+                        for _ in 0..<8 { XCTAssertTrue(route(CapturedInput("keyDown", key: "Escape"))) }
+                        XCTAssertEqual(toggles, 1)
+                        XCTAssertTrue(route(CapturedInput("keyUp", key: "Escape")))
+                    }
+                    XCTAssertEqual(escapes, 0, "No emergency Escape may reach the Windows injector")
+                    let sessions = await a.manager.currentSessions()
+                    XCTAssertEqual(sessions.count, 1, "Input pause must keep the authenticated session")
+                    source.stop();
+                    target.stop()
+                    await a.manager.stop();
+                    await b.manager.stop()
+                } catch {
+                    sender?.stop();
+                    receiver?.stop()
+                    await a.manager.stop();
+                    await b.manager.stop()
+                    throw error
+                }
+            }
+        }
+    }
     @MainActor func testWindowsFunctionSlotsSurviveCrossingAndReleaseBindings() async throws {
         // Keep the mapping fixture's source first in peer priority; ownership arbitration has separate tests.
         let
@@ -2230,6 +2478,10 @@ final class SharingTests: XCTestCase {
             print(
                 "PASS: encrypted large-file transfer bytes=\(received.item.size) name=\(binaryName), full contents and final SHA256 match; staging removed"
             )
+            let checkpoint = a.directory.appendingPathComponent("file-transfers-progress.json")
+            let progressData = try Data(contentsOf: checkpoint)
+            XCTAssertLessThan(progressData.count, 4096, "Chunk progress must not rewrite the catalogue/history")
+            _ = try JSONDecoder().decode(FileProgressStore.self, from: progressData)
             fa.stop()
             let record = a.directory.appendingPathComponent("file-transfers.json")
             let saved = try JSONDecoder().decode(FileTransferStore.self, from: Data(contentsOf: record))

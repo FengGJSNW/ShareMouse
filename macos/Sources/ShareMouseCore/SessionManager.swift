@@ -1293,7 +1293,8 @@ public actor SessionManager {
             inputSent[peerID, default: [:]][inputSequence] = (now, ObjectIdentifier(link))
             filePolicies[peerID, default: FileWindowPolicy()].markInput(now: now)
         }
-        let pending = link.enqueueSend(frame, timeout: channel == "input" ? 3 : nil)
+        // Bound background writes too: a stuck file write must not hold pongs forever.
+        let pending = link.enqueueSend(frame, timeout: channel == "input" ? 3 : link.kind == "ble" ? 60 : 10)
         try await pending.wait()
         return link.kind
     }
