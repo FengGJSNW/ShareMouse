@@ -11,7 +11,7 @@ using ShareMouse.Network;
 
 namespace ShareMouse;
 
-public sealed class WindowsComputerAdapter
+public sealed partial class WindowsComputerAdapter
 {
     private readonly MCPClickFeedback feedback = new();
     private bool showHints = true;
@@ -24,8 +24,9 @@ public sealed class WindowsComputerAdapter
                 feedback.Stop();
         }
     }
-    public void BeginControl()
+    public void BeginControl(JsonNode context)
     {
+        activeControl = context;
     }
     public static bool DesktopAvailable
     {
@@ -53,7 +54,7 @@ public sealed class WindowsComputerAdapter
         var memory = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
         GlobalMemoryStatusEx(ref memory);
         var drive = new DriveInfo(System.IO.Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))!);
-        return ComputerUseService.Obj(("platform", "windows"), ("os_version", RuntimeInformation.OSDescription), ("architecture", RuntimeInformation.OSArchitecture.ToString()), ("hostname", Environment.MachineName), ("input_state", WindowsInputStatus.Capture()), ("mcp_features", ComputerUseService.Obj(("ocr", "optional_native_recognizer"), ("controls", "optional_ui_automation"), ("stable_region", true), ("relative_move", true), ("key_hold", true), ("pointer_animation", true), ("pointer_animation_enabled", ShowHints), ("pointer_animation_scope", "presentation_overlay"), ("control_modes", new[] { "user_mouse" }), ("system_cursor_style_active", false), ("cursor_style", "system"))), ("cpu", cpu?.GetValue("ProcessorNameString") as string ?? "Unknown"), ("cpu_cores", Environment.ProcessorCount), ("memory_bytes", memory.TotalPhysical), ("home_free_bytes", drive.AvailableFreeSpace), ("permissions", ComputerUseService.Obj(("screen_capture", desktopAvailable), ("input_injection", desktopAvailable), ("desktop_available", desktopAvailable), ("session_locked", session.locked), ("session_active", session.active), ("elevation_boundary", "Current user desktop; higher integrity windows may reject input."))));
+        return ComputerUseService.Obj(("platform", "windows"), ("os_version", RuntimeInformation.OSDescription), ("architecture", RuntimeInformation.OSArchitecture.ToString()), ("hostname", Environment.MachineName), ("input_state", InputState()), ("mcp_features", ComputerUseService.Obj(("ocr", "optional_native_recognizer"), ("controls", "optional_ui_automation"), ("stable_region", true), ("relative_move", true), ("key_hold", true), ("pointer_animation", true), ("pointer_animation_enabled", ShowHints), ("pointer_animation_scope", "presentation_overlay"), ("control_modes", new[] { "user_mouse", "independent" }), ("independent_observation", "accessibility_text"), ("provider_may_change_foreground", true), ("system_cursor_style_active", false), ("cursor_style", "system"))), ("cpu", cpu?.GetValue("ProcessorNameString") as string ?? "Unknown"), ("cpu_cores", Environment.ProcessorCount), ("memory_bytes", memory.TotalPhysical), ("home_free_bytes", drive.AvailableFreeSpace), ("permissions", ComputerUseService.Obj(("screen_capture", desktopAvailable), ("input_injection", desktopAvailable), ("desktop_available", desktopAvailable), ("session_locked", session.locked), ("session_active", session.active), ("elevation_boundary", "Current user desktop; higher integrity windows may reject input."))));
     }
     public Task<JsonObject> Capture(ScreenGeometry geometry) => Capture(geometry, new JsonObject(), () => true);
     public async Task<JsonObject> Capture(ScreenGeometry geometry, JsonNode options, Func<bool> active)
@@ -61,6 +62,8 @@ public sealed class WindowsComputerAdapter
         ComputerUseService.ValidateObservationOptions(options);
         if (!DesktopAvailable)
             throw new IOException("desktop_locked_or_unavailable");
+        if (options["_control_context"]?["mode"]?.GetValue<string>() == "independent")
+            return await CaptureAccessibility(geometry, options, active);
         var screen = System.Windows.Forms.Screen.AllScreens.FirstOrDefault(s => geometry.Id.EndsWith(":" + s.DeviceName, StringComparison.Ordinal)) ?? throw new IOException("screen_unavailable");
         var screenBounds = screen.Bounds;
         var roi = options["capture_region"]?.DeepClone() ?? ComputerUseService.Obj(("x", 0), ("y", 0), ("width", 1), ("height", 1));
@@ -314,7 +317,7 @@ public sealed class WindowsComputerAdapter
             return;
         feedback.Show(screen.Bounds.Left + Math.Clamp((int)Math.Round(x * screen.Bounds.Width), 0, screen.Bounds.Width - 1), screen.Bounds.Top + Math.Clamp((int)Math.Round(y * screen.Bounds.Height), 0, screen.Bounds.Height - 1));
     }
-    public void Stop() => feedback.Stop();
+    public void Stop() { feedback.Stop(); activeControl = ComputerUseService.Obj(("mode", "user_mouse")); }
     [StructLayout(LayoutKind.Sequential)]
     private struct MemoryStatus
     {

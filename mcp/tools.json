@@ -94,6 +94,10 @@
         "control_session_id": {
           "type": "string",
           "description": "Optional exact owned token to inspect its independent target without renewing its lease."
+        },
+        "list_windows": {
+          "type": "boolean",
+          "description": "List visible top-level windows without focusing or acquiring control."
         }
       },
       "required": [
@@ -335,11 +339,15 @@
             "user_mouse",
             "independent"
           ],
-          "description": "Independent is Mac app-window control; never falls back to the user cursor. user_mouse temporarily isolates keyboard/mouse sharing only."
+          "description": "user_mouse uses the system cursor; independent binds a window and uses accessibility. Windows returns a text tree and providers may activate their own window."
         },
         "application": {
           "type": "string",
           "description": "Running Mac application name/bundle ID for independent window control."
+        },
+        "window_id": {
+          "type": "string",
+          "description": "Exact window ID from get_computer_info list_windows. Requires independent mode."
         }
       },
       "required": [
@@ -948,6 +956,44 @@
                   "application"
                 ],
                 "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "ax_click"
+                  },
+                  "element_id": {
+                    "type": "string",
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "type",
+                  "element_id"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "set_value"
+                  },
+                  "element_id": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "element_id",
+                  "text"
+                ],
+                "additionalProperties": false
               }
             ]
           }
@@ -1369,6 +1415,92 @@
       "readOnlyHint": false,
       "destructiveHint": false,
       "openWorldHint": false
+    }
+  },
+  {
+    "name": "browser_command",
+    "description": "Native browser extension command under an existing control lease. Prefer browser_use facade. Never injects system mouse input. Every request_id UUID is executed at most once within its lease.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "peer_id": {
+          "type": "string"
+        },
+        "control_session_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "command": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "tabs",
+                "observe",
+                "navigate",
+                "click",
+                "fill",
+                "select",
+                "check",
+                "press"
+              ]
+            },
+            "tab_id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "url": {
+              "type": "string"
+            },
+            "element_id": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "key": {
+              "type": "string"
+            },
+            "max_nodes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "peer_id",
+        "control_session_id",
+        "request_id",
+        "command"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
     }
   }
 ]

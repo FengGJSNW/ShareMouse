@@ -84,6 +84,7 @@ public enum ComputerUseError: Error, LocalizedError {
     public var allowFiles = false
     public var controlling: Bool { control != nil }
     public var controlContext: JSONValue { control?.context ?? .null }
+    public var browserHandler: (@MainActor (JSONValue, @escaping @MainActor () -> Bool) async throws -> JSONValue)?
     private let id: String, name: String
     private let manager: SessionManager
     private let screens: () -> [ScreenGeometry]
@@ -100,6 +101,8 @@ public enum ComputerUseError: Error, LocalizedError {
     private let focusApplication: (String) async throws -> Void
     private let prepareControl: (JSONValue) throws -> JSONValue
     private let validatePlatformAction: (JSONValue, ScreenGeometry, Double, Double) throws -> Void
+    private let listWindows: () -> JSONValue
+    private let accessibilityAction: (JSONValue) async throws -> Void
     private let pointerPreview: (ScreenGeometry, Double, Double, String) -> Int
     private let now: () -> Date
     private let diagnostic: (String) -> Void
@@ -117,6 +120,8 @@ public enum ComputerUseError: Error, LocalizedError {
         var context: JSONValue = .object(["mode": .string("user_mouse")])
         var region: JSONValue = .object(["x": .number(0), "y": .number(0), "width": .number(1), "height": .number(1)])
         var completed: [String: (Data, JSONValue)] = [:]
+        var browserCompleted: [String: (Data, JSONValue)] = [:]
+        var browserRequests = Set<String>()
         var lastResult: JSONValue = .null, lastCapturedAt: JSONValue = .null, lastWindowID: String?
         var openRequest: String?
     }
@@ -165,7 +170,9 @@ public enum ComputerUseError: Error, LocalizedError {
             guard mode == "user_mouse" else { throw ComputerUseError.message("control_mode_unsupported") }
             return .object(["mode": .string(mode)])
         },
-        validatePlatformAction: @escaping (JSONValue, ScreenGeometry, Double, Double) throws -> Void = { _, _, _, _ in }
+        validatePlatformAction: @escaping (JSONValue, ScreenGeometry, Double, Double) throws -> Void = { _, _, _, _ in },
+        listWindows: @escaping () -> JSONValue = { .array([]) },
+        accessibilityAction: @escaping (JSONValue) async throws -> Void = { _ in throw ComputerUseError.message("accessibility_action_unavailable") }
     ) {
         self.id = id;
         self.name = name;
@@ -190,6 +197,8 @@ public enum ComputerUseError: Error, LocalizedError {
         self.focusApplication = focusApplication;
         self.prepareControl = prepareControl;
         self.validatePlatformAction = validatePlatformAction
+        self.listWindows = listWindows
+        self.accessibilityAction = accessibilityAction
     }
     public func start() async {
         await manager.receive(channel: "computer") { [weak self] peer, bytes in await self?.receive(peer, bytes) }
@@ -361,6 +370,11 @@ public enum ComputerUseError: Error, LocalizedError {
             Task {
                 try? await Task.sleep(for: .seconds(60))
                 if let expired = pending.removeValue(forKey: request) {
+                    if operation == "browser", BrowserBroker.isReadOnly(arguments["command"]) {
+                        expired.result.resume(throwing: BrowserBroker.failure(
+                            "remote_timeout_execution_unknown", command: arguments["command"], delivered: true))
+                        return
+                    }
                     if expired.operation == "open" {
                         Task { try? await sendOpenSignal(peer, type: "open_cancel", request: request) }
                     }
@@ -514,6 +528,10 @@ public enum ComputerUseError: Error, LocalizedError {
             result["allow_computer"] = .bool(allowComputer);
             result["allow_files"] = .bool(allowFiles);
             result["control_state"] = controlState(owner: owner, snapshot: result)
+            if args["list_windows"] == .bool(true) {
+                guard allowComputer else { throw ComputerUseError.message("computer_access_disabled") }
+                result["windows"] = listWindows()
+            }
             if args["read_screen"] == .bool(true) {
                 guard allowComputer else { throw ComputerUseError.message("computer_access_disabled") }
                 try Self.validateObservationOptions(args)
@@ -660,13 +678,74 @@ public enum ComputerUseError: Error, LocalizedError {
             endControl();
             return .object(["closed": .bool(true)])
         case "actions": return try await actions(args, owner: owner)
+        case "browser": return try await browser(args, owner: owner)
         default: throw ComputerUseError.message("unknown_operation")
         }
+    }
+    private func browser(_ args: JSONValue, owner: String) async throws -> JSONValue {
+        var c = try checked(args, owner: owner)
+        let request = try args.required("request_id")
+        guard UUID(uuidString: request) != nil else { throw ComputerUseError.message("request_id_must_be_uuid") }
+        let command = args["command"]
+        try BrowserBroker.validate(command)
+        let signature = try JSONValue.object(["browser": command]).data()
+        if let cached = c.browserCompleted[request] {
+            guard cached.0 == signature else { throw ComputerUseError.message("request_id_reused_with_different_actions") }
+            return cached.1
+        }
+        guard !c.busy else { throw ComputerUseError.message("computer_busy") }
+        guard !c.browserRequests.contains(request) else { throw ComputerUseError.message("browser_request_result_expired") }
+        guard c.completed[request] == nil else { throw ComputerUseError.message("request_id_reused_with_different_actions") }
+        guard c.browserRequests.count < 4096 else { throw ComputerUseError.message("browser_request_limit_reached") }
+        guard let browserHandler else { throw ComputerUseError.message("browser_extension_unavailable") }
+        c.busy = true
+        c.browserRequests.insert(request)
+        c.expires = now().addingTimeInterval(max(c.idleSeconds, 30))
+        control = c
+        var result: JSONValue = .object([
+            "peer_id": .string(id), "control_session_id": .string(c.token), "request_id": .string(request)
+        ])
+        do {
+            result["browser"] = try await browserHandler(command, { [weak self] in
+                guard let self else { return false }
+                return (try? self.checked(args, owner: owner)) != nil
+            })
+            _ = try checked(args, owner: owner)
+        } catch {
+            // Failed/unknown commands are cached too: a repeated request must never reinject.
+            let readOnly = BrowserBroker.isReadOnly(command)
+            let message = Self.errorDetails(error)["message"].string ?? error.localizedDescription
+            let browserError: Error = readOnly && BrowserBroker.isTimeout(error.localizedDescription)
+                ? BrowserBroker.failure(message, command: command, delivered: true) : error
+            let outcome = Self.errorDetails(error)["input_outcome"]
+            let failure: Error
+            do { _ = try checked(args, owner: owner); failure = browserError }
+            catch { failure = error }
+            result["browser"] = .null
+            result["error"] = .string(failure.localizedDescription)
+            result["error_details"] = Self.errorDetails(failure)
+            result["error_details"]["read_only"] = .bool(readOnly)
+            if readOnly { result["error_details"]["input_outcome"] = .string("not_attempted") }
+            else if outcome != .null { result["error_details"]["input_outcome"] = outcome }
+        }
+        if var current = control, current.token == c.token, current.owner == owner {
+            current.busy = false
+            current.expires = now().addingTimeInterval(current.idleSeconds)
+            result["control_session_expires_at"] = .string(ISO8601DateFormatter().string(from: current.expires))
+            current.lastResult = result
+            if current.browserCompleted.count >= 64, let evicted = current.browserCompleted.keys.first {
+                current.browserCompleted.removeValue(forKey: evicted)
+            }
+            current.browserCompleted[request] = (signature, result)
+            control = current
+        }
+        return result
     }
     private func actions(_ args: JSONValue, owner: String) async throws -> JSONValue {
         var c = try checked(args, owner: owner)
         let request = args["request_id"].string ?? UUID().uuidString.lowercased()
         guard UUID(uuidString: request) != nil else { throw ComputerUseError.message("request_id_must_be_uuid") }
+        guard !c.browserRequests.contains(request) else { throw ComputerUseError.message("request_id_reused_with_different_actions") }
         var body = args.object;
         for key in ["peer_id", "control_session_id", "observation_id", "request_id"] { body.removeValue(forKey: key) }
         let signature = try JSONValue.object(body).data()
@@ -853,6 +932,12 @@ public enum ComputerUseError: Error, LocalizedError {
             throw ComputerUseError.message("independent_action_not_supported")
         }
         switch try a.required("type") {
+        case "ax_click", "set_value":
+            guard c.context["mode"].string == "independent", let element = a["element_id"].string,
+                !element.isEmpty, element.count <= 512 else { throw ComputerUseError.message("accessible_element_required") }
+            if a["type"].string == "set_value" {
+                guard let text = a["text"].string, text.utf8.count <= 131072 else { throw ComputerUseError.message("invalid_text") }
+            }
         case "click", "double_click", "move", "scroll":
             _ = try point(a, c);
             if a["type"].string == "scroll" {
@@ -919,6 +1004,10 @@ public enum ComputerUseError: Error, LocalizedError {
     private func apply(_ a: JSONValue, _ c: Control, expectedWindow: String?) async throws {
         let button = ["left": 0, "right": 1, "middle": 2][a["button"].string ?? "left"] ?? 0
         switch a["type"].string {
+        case "ax_click", "set_value":
+            injectionAttempted = true
+            try await accessibilityAction(a)
+            successfulInjectionCalls += 1
         case "move":
             try await preview(a, c, expectedWindow: expectedWindow);
             try move(a, c, kind: "move")
@@ -1043,7 +1132,7 @@ public enum ComputerUseError: Error, LocalizedError {
             "get_computer_info": "info", "get_control_status": "status", "open_computer": "open",
             "observe_computer": "observe", "computer_action": "actions", "release_input": "close",
             "close_computer": "close", "list_transfers": "transfers", "get_transfer": "transfers",
-            "control_transfer": "transfer_action",
+            "control_transfer": "transfer_action", "browser_command": "browser",
         ][name]
         guard let operation else { throw ComputerUseError.message("unknown_tool") };
         return try await call(a.required("peer_id"), operation: operation, arguments: a)

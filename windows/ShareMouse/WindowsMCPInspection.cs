@@ -30,7 +30,8 @@ internal static class WindowsMCPInspection
             var request = Path.Combine(folder, "request.json");
             var output = Path.Combine(folder, "result.json");
             File.WriteAllText(request, ComputerUseService.Obj(("options", options), ("desktop_bounds", bounds), ("width", width), ("height", height), ("window_id", windowID)).ToJsonString());
-            var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = AppContext.BaseDirectory };
+            var executable = Path.Combine(Path.GetDirectoryName(typeof(WindowsMCPInspection).Assembly.Location)!, "ShareMouse.exe");
+            var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = AppContext.BaseDirectory };
             start.ArgumentList.Add("--mcp-inspect");
             start.ArgumentList.Add(request);
             child = Process.Start(start) ?? throw new IOException("inspection_start_failed");
@@ -68,12 +69,14 @@ internal static class WindowsMCPInspection
             var data = JsonNode.Parse(File.ReadAllText(path))!;
             var options = data["options"]!;
             ComputerUseService.ValidateObservationOptions(options);
-            if (ComputerUseService.Flag(options, "include_ocr"))
+            if (options["_accessibility_action"] is { } action)
+                result = Act(data, action);
+            else if (ComputerUseService.Flag(options, "include_ocr"))
                 result["ocr"] = await Recognize(File.ReadAllBytes(Path.Combine(folder, "frame.png")), options);
             if (ComputerUseService.Flag(options, "include_controls") || ComputerUseService.Flag(options, "text_only"))
                 result["controls"] = Controls(data, options);
         }
-        catch (Exception) { result["status"] = "unavailable"; }
+        catch (Exception e) { result["status"] = "unavailable"; result["error"] = e is IOException ? e.Message : "accessibility_provider_failed"; }
         File.WriteAllText(Path.Combine(folder, "result.json"), result.ToJsonString());
     }
     private static async Task<JsonObject> Recognize(byte[] png, JsonNode options)
@@ -124,7 +127,8 @@ internal static class WindowsMCPInspection
     private static JsonObject Controls(JsonNode data, JsonNode options)
     {
         var started = Stopwatch.StartNew();
-        var hwnd = GetForegroundWindow();
+        var independent = options["_control_context"]?["mode"]?.GetValue<string>() == "independent";
+        var hwnd = independent ? WindowsComputerAdapter.WindowHandle(data["window_id"]!.GetValue<string>()) : GetForegroundWindow();
         GetWindowThreadProcessId(hwnd, out var pid);
         var windowID = "win:" + pid + ":" + hwnd.ToInt64().ToString("X");
         if (data["window_id"]?.GetValue<string>() != windowID)
@@ -141,9 +145,17 @@ internal static class WindowsMCPInspection
         {
             var current = element.Current;
             var rect = current.BoundingRectangle;
-            if (current.IsOffscreen || rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0 || rect.Right <= left || rect.Left >= left + dx || rect.Bottom <= top || rect.Top >= top + dy)
+            if ((!independent && current.IsOffscreen) || rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0 || rect.Right <= left || rect.Left >= left + dx || rect.Bottom <= top || rect.Top >= top + dy)
                 return null;
             var item = ComputerUseService.Obj(("name", current.Name), ("role", current.ControlType.ProgrammaticName), ("automation_id", current.AutomationId), ("enabled", current.IsEnabled), ("bounds", ComputerUseService.Obj(("x", (rect.X - left) / dx * width), ("y", (rect.Y - top) / dy * height), ("width", rect.Width / dx * width), ("height", rect.Height / dy * height))), ("coordinate_space", "screenshot_pixels"), ("source", "windows_ui_automation"));
+            if (independent)
+            {
+                item["element_id"] = ElementID(element);
+                var actions = new JsonArray();
+                if (element.TryGetCurrentPattern(InvokePattern.Pattern, out _) || element.TryGetCurrentPattern(TogglePattern.Pattern, out _) || element.TryGetCurrentPattern(SelectionItemPattern.Pattern, out _)) actions.Add("click");
+                if (element.TryGetCurrentPattern(ValuePattern.Pattern, out var editable) && !((ValuePattern)editable).Current.IsReadOnly) actions.Add("set_value");
+                item["actions"] = actions;
+            }
             if (current.IsPassword)
             {
                 item["value_redacted"] = true;
@@ -200,9 +212,46 @@ internal static class WindowsMCPInspection
             }
             catch (ElementNotAvailableException) { result["element_at_point"] = null; }
         }
-        if (GetForegroundWindow() != hwnd)
+        if (!independent && GetForegroundWindow() != hwnd)
             return ComputerUseService.Obj(("status", "window_changed_during_inspection"));
         return result;
+    }
+    private static string ElementID(AutomationElement element) => "uia:" + string.Join(".", element.GetRuntimeId());
+    private static JsonObject Act(JsonNode data, JsonNode action)
+    {
+        var options = data["options"]!;
+        if (options["_control_context"]?["mode"]?.GetValue<string>() != "independent") throw new IOException("independent_control_required");
+        var hwnd = WindowsComputerAdapter.WindowHandle(data["window_id"]!.GetValue<string>());
+        var root = AutomationElement.FromHandle(hwnd);
+        var wanted = action["element_id"]!.GetValue<string>();
+        var queue = new Queue<AutomationElement>(); queue.Enqueue(root);
+        var walker = TreeWalker.ControlViewWalker;
+        var clock = Stopwatch.StartNew(); var visited = 0;
+        AutomationElement? selected = null;
+        while (queue.Count > 0 && visited++ < 200 && clock.ElapsedMilliseconds < 1500)
+        {
+            var element = queue.Dequeue();
+            if (ElementID(element) == wanted) { selected = element; break; }
+            for (var child = walker.GetFirstChild(element); child is not null && queue.Count + visited < 200; child = walker.GetNextSibling(child)) queue.Enqueue(child);
+        }
+        if (selected is null) throw new IOException("accessible_element_stale");
+        if (!selected.Current.IsEnabled) throw new IOException("accessible_element_disabled");
+        // Recheck the live window immediately before invoking a provider. Never use SendInput or SetFocus.
+        _ = WindowsComputerAdapter.WindowHandle(data["window_id"]!.GetValue<string>());
+        if (action["type"]!.GetValue<string>() == "set_value")
+        {
+            if (!selected.TryGetCurrentPattern(ValuePattern.Pattern, out var value) || ((ValuePattern)value).Current.IsReadOnly) throw new IOException("accessible_value_not_settable");
+            ((ValuePattern)value).SetValue(action["text"]!.GetValue<string>());
+        }
+        else if (action["type"]!.GetValue<string>() == "ax_click")
+        {
+            if (selected.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke)) ((InvokePattern)invoke).Invoke();
+            else if (selected.TryGetCurrentPattern(TogglePattern.Pattern, out var toggle)) ((TogglePattern)toggle).Toggle();
+            else if (selected.TryGetCurrentPattern(SelectionItemPattern.Pattern, out var selection)) ((SelectionItemPattern)selection).Select();
+            else throw new IOException("accessible_click_unsupported");
+        }
+        else throw new IOException("unsupported_accessibility_action");
+        return ComputerUseService.Obj(("action_completed", true));
     }
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);

@@ -9,9 +9,9 @@
         <ImplicitUsings>disable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AssemblyName>ShareMouse</AssemblyName>
-        <Version>0.1.0-alpha.3</Version>
+        <Version>0.1.0</Version>
         <AssemblyVersion>0.1.0.0</AssemblyVersion>
-        <FileVersion>0.1.0.37</FileVersion>
+        <FileVersion>0.1.0.44</FileVersion>
         <ApplicationIcon>..\..\resources\app-icon\ShareMouse.ico</ApplicationIcon>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <!-- WPF starts this app; WinForms is used only for tray/screen helpers.

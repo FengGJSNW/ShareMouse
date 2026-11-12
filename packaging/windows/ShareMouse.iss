@@ -1,8 +1,8 @@
 #ifndef ReleaseVersion
-  #define ReleaseVersion "v0.1.0-alpha.3"
+  #define ReleaseVersion "v0.1.0"
 #endif
 #ifndef NumericVersion
-  #define NumericVersion "0.1.0.37"
+  #define NumericVersion "0.1.0.44"
 #endif
 #ifndef PublishDir
   #error PublishDir must point to the self-contained win-x64 output

@@ -5,6 +5,390 @@ import XCTest
 @testable import ShareMouseCore
 
 final class ComputerUseQualityTests: XCTestCase {
+    @MainActor func testBrowserMissingHostUsesOnlyValidLocalStartupName() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let server = try MCPServer(service: fixture.service, directory: fixture.directory, tools: Data("[]".utf8))
+        defer { server.stop() }
+        let directory = fixture.directory.appendingPathComponent("browser")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let path = directory.appendingPathComponent("startup.json")
+        _ = try await fixture.open()
+        let valid = try JSONValue.object(["preferred_shortcut_name": .string("Edge Custom Profile")]).data()
+        let invalidNames = ["", " \t ", String(repeating: "x", count: 257), "Edge\nother", "Edge\u{202E}hidden"]
+        let cases: [(Data, Bool)] = [(valid, true), (valid + Data(repeating: 32, count: 4096 - valid.count), true),
+            (valid + Data(repeating: 32, count: 4097 - valid.count), false), (Data("[]".utf8), false)]
+            + (try invalidNames.map { (try JSONValue.object(["preferred_shortcut_name": .string($0)]).data(), false) })
+        for (data, accepted) in cases {
+            try data.write(to: path)
+            var args = fixture.args
+            args["request_id"] = .string(UUID().uuidString)
+            args["command"] = .object(["action": .string("tabs")])
+            let result = try await fixture.service.tool("browser_command", arguments: args)
+            XCTAssertEqual(result["error_details"]["code"], .string("browser_extension_unavailable"))
+            XCTAssertEqual(result["error_details"]["startup"], accepted
+                ? .object(["preferred_shortcut_name": .string("Edge Custom Profile")]) : .null)
+        }
+        XCTAssertTrue(fixture.events.isEmpty)
+        await fixture.manager.stop()
+    }
+    @MainActor func testBrowserNativeToolRequiresExistingControlLease() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        do {
+            _ = try await fixture.service.tool("browser_command", arguments: .object([
+                "peer_id": .string("local"), "request_id": .string(UUID().uuidString),
+                "command": .object(["action": .string("tabs")])]))
+            XCTFail("Browser inventory bypassed control lease")
+        } catch { XCTAssertEqual(error.localizedDescription, "missing_control_session_id") }
+        let server = try MCPServer(service: fixture.service, directory: fixture.directory, tools: Data("[]".utf8))
+        let response = await server.process(.object([
+            "jsonrpc": .string("2.0"), "id": .number(1), "method": .string("browser/exchange"),
+            "params": .object(["instance_id": .string(UUID().uuidString)])]))
+        XCTAssertEqual(response?["result"], .object(["command": .null]))
+        await fixture.manager.stop()
+    }
+    @MainActor func testBrowserBrokerRoutingReplayAndUserExitNeverUseDesktopInput() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let server = try MCPServer(service: fixture.service, directory: fixture.directory, tools: Data("[]".utf8))
+        let host = UUID().uuidString
+        func exchange(_ response: JSONValue = .null) async -> JSONValue {
+            let answer = await server.process(.object([
+                "jsonrpc": .string("2.0"), "id": .number(1), "method": .string("browser/exchange"),
+                "params": .object(["instance_id": .string(host), "response": response])]))
+            return answer?["result"]["command"] ?? .null
+        }
+        _ = await exchange()
+        _ = try await fixture.open()
+        var args = fixture.args
+        args["request_id"] = .string(UUID().uuidString)
+        args["command"] = .object(["action": .string("observe"), "tab_id": .number(7)])
+        let captures = fixture.captures
+        let request = args
+        let running = Task { try await fixture.service.tool("browser_command", arguments: request) }
+        for _ in 0..<10 { await Task.yield() }
+        let command = await exchange()
+        XCTAssertEqual(command["command"], args["command"])
+        XCTAssertNotNil(command["deadline_ms"].number)
+        _ = await exchange(.object(["id": command["id"], "result": .object(["title": .string("Background tab")])]))
+        let result = try await running.value
+        XCTAssertEqual(result["browser"]["title"], .string("Background tab"))
+        let replay = try await fixture.service.tool("browser_command", arguments: request)
+        XCTAssertEqual(replay, result)
+        let replayCommand = await exchange()
+        XCTAssertEqual(replayCommand, .null)
+        var rejectedRequest = args
+        rejectedRequest["request_id"] = .string(UUID().uuidString)
+        rejectedRequest["command"] = .object(["action": .string("click"), "tab_id": .number(7),
+            "role": .string("link"), "name": .string("npm")])
+        let rejectedArgs = rejectedRequest
+        let rejecting = Task { try await fixture.service.tool("browser_command", arguments: rejectedArgs) }
+        for _ in 0..<10 { await Task.yield() }
+        let rejectedCommand = await exchange()
+        _ = await exchange(.object(["id": rejectedCommand["id"], "error": .string("ambiguous_element: two npm links")]))
+        let rejected = try await rejecting.value
+        XCTAssertEqual(rejected["error_details"]["input_outcome"], .string("not_attempted"))
+        XCTAssertEqual(rejected["error_details"]["next_step"], .string("observe_and_choose_fresh_element"))
+        let rejectedReplay = try await fixture.service.tool("browser_command", arguments: rejectedArgs)
+        XCTAssertEqual(rejectedReplay, rejected)
+        let rejectionRedelivery = await exchange()
+        XCTAssertEqual(rejectionRedelivery, .null)
+        XCTAssertEqual(fixture.captures, captures)
+        XCTAssertTrue(fixture.events.isEmpty)
+        args["command"]["action"] = .string("click")
+        args["command"]["element_id"] = .string("button")
+        do { _ = try await fixture.service.tool("browser_command", arguments: args); XCTFail("Request reuse accepted") }
+        catch { XCTAssertEqual(error.localizedDescription, "request_id_reused_with_different_actions") }
+        args["request_id"] = .string(UUID().uuidString)
+        let nextRequest = args
+        let exiting = Task { try await fixture.service.tool("browser_command", arguments: nextRequest) }
+        for _ in 0..<10 { await Task.yield() }
+        do { _ = try await fixture.service.tool("browser_command", arguments: nextRequest); XCTFail("Concurrent request accepted") }
+        catch { XCTAssertEqual(error.localizedDescription, "computer_busy") }
+        do { _ = try await fixture.service.tool("browser_command", arguments: request); }
+        catch { XCTFail("Completed result should remain replayable while busy") }
+        fixture.service.endControl(reason: "user_exit")
+        let abandoned = await exchange()
+        XCTAssertEqual(abandoned, .null)
+        let ended = try await exiting.value
+        XCTAssertEqual(ended["error"], .string("control_session_unavailable:user_exit"))
+        XCTAssertEqual(ended["error_details"]["input_outcome"], .string("not_attempted"))
+        _ = try await fixture.open()
+        var sentArgs = fixture.args
+        sentArgs["request_id"] = .string(UUID().uuidString)
+        sentArgs["command"] = nextRequest["command"]
+        let sentRequest = sentArgs
+        let deliveredBeforeExit = Task { try await fixture.service.tool("browser_command", arguments: sentRequest) }
+        for _ in 0..<10 { await Task.yield() }
+        let handedOff = await exchange()
+        XCTAssertNotEqual(handedOff, .null)
+        fixture.service.endControl(reason: "user_exit")
+        _ = await exchange()
+        let uncertain = try await deliveredBeforeExit.value
+        XCTAssertEqual(uncertain["error_details"]["code"], .string("user_exit"))
+        XCTAssertEqual(uncertain["error_details"]["input_outcome"], .string("unknown"))
+        XCTAssertTrue(fixture.events.isEmpty)
+        await fixture.manager.stop()
+    }
+    @MainActor func testBrowserBrokerTimeoutProfileAmbiguityAndInputValidation() async throws {
+        var time = Date()
+        let broker = BrowserBroker(now: { time }, timeout: 1)
+        let host = UUID().uuidString
+        let poll: JSONValue = .object(["instance_id": .string(host)])
+        _ = try broker.exchange(poll)
+        let command: JSONValue = .object(["action": .string("click"), "tab_id": .number(1), "element_id": .string("button")])
+        let running = Task { try await broker.execute(command, active: { true }) }
+        for _ in 0..<10 { await Task.yield() }
+        let dispatched = try broker.exchange(poll)["command"]
+        XCTAssertEqual(dispatched["command"], command)
+        time = time.addingTimeInterval(2)
+        XCTAssertEqual(try broker.exchange(poll)["command"], .null)
+        do { _ = try await running.value; XCTFail("Timed-out input succeeded") }
+        catch {
+            XCTAssertEqual(error.localizedDescription, "browser_timeout_execution_unknown")
+            XCTAssertEqual(ComputerUseService.errorDetails(error)["input_outcome"], .string("unknown"))
+        }
+        _ = try broker.exchange(.object(["instance_id": .string(host), "response": .object([
+            "id": dispatched["id"], "result": .object(["late": .bool(true)])])]))
+        _ = try broker.exchange(.object(["instance_id": .string(UUID().uuidString)]))
+        do { _ = try await broker.execute(command, active: { true }); XCTFail("Ambiguous profile accepted") }
+        catch { XCTAssertEqual(error.localizedDescription, "browser_profile_ambiguous") }
+        for invalid: JSONValue in [
+            .object(["action": .string("eval"), "script": .string("1")]),
+            .object(["action": .string("navigate"), "tab_id": .number(1), "url": .string("javascript:alert(1)")]),
+            .object(["action": .string("observe"), "tab_id": .number(1.5)]),
+            .object(["action": .string("observe"), "tab_id": .number(0)]),
+            .object(["action": .string("observe"), "tab_id": .number(1), "max_nodes": .number(501)]),
+            .object(["action": .string("click"), "tab_id": .number(1), "role": .string("button")])
+        ] { XCTAssertThrowsError(try BrowserBroker.validate(invalid)) }
+        try BrowserBroker.validate(.object(["action": .string("click"), "tab_id": .number(1),
+            "role": .string("button"), "name": .string("Submit")]))
+        XCTAssertThrowsError(try broker.exchange(.object(["instance_id": .string(host),
+            "method": .string("tools/call")])))
+        XCTAssertThrowsError(try broker.exchange(.object(["instance_id": .string(host), "response": .object([
+            "id": .string(UUID().uuidString), "result": .string(String(repeating: "x", count: 245760))])]))) {
+            XCTAssertEqual($0.localizedDescription, "browser_response_too_large")
+        }
+        broker.stop()
+    }
+    @MainActor func testBrowserReadFailuresNeverReportUnknownInputOrUnboundedRecovery() async throws {
+        var time = Date()
+        let broker = BrowserBroker(now: { time }, timeout: 1)
+        defer { broker.stop() }
+        let host = UUID().uuidString
+        let poll: JSONValue = .object(["instance_id": .string(host)])
+        for action in ["tabs", "observe"] {
+            let command: JSONValue = action == "tabs" ? .object(["action": .string(action)])
+                : .object(["action": .string(action), "tab_id": .number(1)])
+            for source in ["broker", "browser_timeout_execution_unknown", "deadline_exceeded: operation timed out"] {
+                _ = try broker.exchange(poll)
+                let task = Task { try await broker.execute(command, active: { true }) }
+                for _ in 0..<10 { await Task.yield() }
+                let delivery = try broker.exchange(poll)["command"]
+                if source == "broker" {
+                    time = time.addingTimeInterval(2)
+                    _ = try broker.exchange(poll)
+                } else {
+                    _ = try broker.exchange(.object(["instance_id": .string(host), "response": .object([
+                        "id": delivery["id"], "error": .string(source)])]))
+                }
+                do { _ = try await task.value; XCTFail("Timed-out read succeeded") }
+                catch {
+                    let details = ComputerUseService.errorDetails(error)
+                    XCTAssertEqual(error.localizedDescription, "browser_read_timeout")
+                    XCTAssertEqual(details["read_only"], .bool(true))
+                    XCTAssertEqual(details["input_outcome"], .string("not_attempted"))
+                    XCTAssertEqual(details["retryable"], .bool(true))
+                    XCTAssertEqual(details["max_retries"], .number(1))
+                    XCTAssertEqual(details["next_step"], .string("retry_read_once_then_report_unavailable"))
+                }
+            }
+        }
+        for code in ["browser_tab_frozen", "browser_tab_discarded"] {
+            for action in ["click", "observe"] {
+                let command: JSONValue = .object(["action": .string(action), "tab_id": .number(1), "element_id": .string("button")])
+                let message = code + ": tab 1449689917 is suspended; DOM execution unavailable"
+                _ = try broker.exchange(poll)
+                let task = Task { try await broker.execute(command, active: { true }) }
+                for _ in 0..<10 { await Task.yield() }
+                let delivery = try broker.exchange(poll)["command"]
+                _ = try broker.exchange(.object(["instance_id": .string(host), "response": .object([
+                    "id": delivery["id"], "error": .string(message)])]))
+                do { _ = try await task.value; XCTFail("Frozen tab accepted input") }
+                catch {
+                    let details = ComputerUseService.errorDetails(error)
+                    XCTAssertEqual(error.localizedDescription, code)
+                    XCTAssertEqual(details["code"], .string(code))
+                    XCTAssertEqual(details["message"], .string(message))
+                    XCTAssertEqual(details["read_only"], .bool(action == "observe"))
+                    XCTAssertEqual(details["input_outcome"], .string("not_attempted"))
+                    XCTAssertEqual(details["retryable"], .bool(false))
+                    XCTAssertEqual(details["next_step"], .string("inspect_tab_state_before_new_request"))
+                }
+            }
+        }
+    }
+    @MainActor func testBrowserPreflightRejectionsDoNotReportAttemptedInput() async throws {
+        let broker = BrowserBroker()
+        defer { broker.stop() }
+        let host = UUID().uuidString
+        let poll: JSONValue = .object(["instance_id": .string(host)])
+        let preflight = [
+            ("click", "ambiguous_element"), ("click", "stale_element"), ("click", "element_not_found"),
+            ("click", "locator_scan_truncated"), ("click", "disabled_element"), ("click", "hidden_element"),
+            ("click", "element_not_clickable"), ("click", "one_exact_locator_required"), ("click", "wrong_tab"),
+            ("click", "explicit_tab_id_required"), ("click", "max_nodes_must_be_1_to_500"), ("click", "unsupported_action"),
+            ("fill", "readonly_element"), ("fill", "element_not_fillable"), ("fill", "invalid_text"),
+            ("select", "single_select_required"), ("select", "value_required"), ("select", "option_scan_truncated"),
+            ("select", "ambiguous_option"), ("select", "option_not_found"), ("select", "disabled_option"),
+            ("check", "native_checkable_required"), ("check", "radio_cannot_be_unchecked"),
+            ("press", "unsupported_key"), ("press", "element_not_focusable")
+        ]
+        let afterDispatch = [
+            ("fill", "fill_not_applied"), ("select", "select_not_applied"), ("check", "check_not_applied"),
+            ("press", "focus_not_applied"), ("press", "focus_scan_truncated"), ("press", "focus_boundary"),
+            ("click", "deadline_exceeded"), ("click", "document_unavailable"), ("click", "ambiguous_element_other")
+        ]
+        for (index, item) in (preflight + afterDispatch).enumerated() {
+            let (action, code) = item
+            let message = code + ": DOM rejected the command"
+            let command: JSONValue = .object(["action": .string(action), "tab_id": .number(1),
+                "element_id": .string("element"), "text": .string("value"), "value": .string("option"),
+                "checked": .bool(true), "key": .string("Enter")])
+            _ = try broker.exchange(poll)
+            let task = Task { try await broker.execute(command, active: { true }) }
+            for _ in 0..<10 { await Task.yield() }
+            let delivery = try broker.exchange(poll)["command"]
+            _ = try broker.exchange(.object(["instance_id": .string(host), "response": .object([
+                "id": delivery["id"], "error": .string(message)])]))
+            do { _ = try await task.value; XCTFail("Rejected input succeeded") }
+            catch {
+                let details = ComputerUseService.errorDetails(error)
+                let rejectedBeforeInput = index < preflight.count
+                XCTAssertEqual(details["code"], .string(code))
+                XCTAssertEqual(details["message"], .string(message))
+                XCTAssertEqual(details["input_outcome"], .string(rejectedBeforeInput ? "not_attempted" : "unknown"), code)
+                XCTAssertEqual(details["retryable"], .bool(false))
+                XCTAssertEqual(details["max_retries"], .number(0))
+                XCTAssertEqual(details["next_step"], .string(rejectedBeforeInput
+                    ? "observe_and_choose_fresh_element" : "observe_before_new_request"), code)
+            }
+        }
+    }
+    @MainActor func testBrowserPagePreflightRejectionOnlyCertifiesDOMCommands() async throws {
+        let broker = BrowserBroker()
+        defer { broker.stop() }
+        let host = UUID().uuidString
+        let poll: JSONValue = .object(["instance_id": .string(host)])
+        for code in ["browser_page_loading", "browser_page_error"] {
+            for action in ["observe", "click", "navigate"] {
+                let command: JSONValue = .object(["action": .string(action), "tab_id": .number(1),
+                    "element_id": .string("element"), "url": .string("https://example.com/")])
+                _ = try broker.exchange(poll)
+                let task = Task { try await broker.execute(command, active: { true }) }
+                for _ in 0..<10 { await Task.yield() }
+                let delivery = try broker.exchange(poll)["command"]
+                _ = try broker.exchange(.object(["instance_id": .string(host), "response": .object([
+                    "id": delivery["id"], "error": .string(code + ": page cannot run DOM commands")])]))
+                do { _ = try await task.value; XCTFail("Unavailable page accepted input") }
+                catch {
+                    let details = ComputerUseService.errorDetails(error)
+                    let retryable = action == "observe" && code == "browser_page_loading"
+                    XCTAssertEqual(details["input_outcome"], .string(action == "navigate" ? "unknown" : "not_attempted"))
+                    XCTAssertEqual(details["retryable"], .bool(retryable))
+                    XCTAssertEqual(details["max_retries"], .number(retryable ? 1 : 0))
+                    XCTAssertEqual(details["next_step"], .string(action == "navigate" ? "observe_before_new_request"
+                        : code == "browser_page_loading" ? "observe_loading_page_with_bounded_retry" : "report_browser_page_unavailable"))
+                }
+            }
+        }
+    }
+    @MainActor func testBrowserUnknownResultRemainsCachedAcrossDesktopActions() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.open()
+        var calls = 0
+        fixture.service.browserHandler = { _, active in
+            XCTAssertTrue(active())
+            calls += 1
+            throw ComputerUseError.message("browser_timeout_execution_unknown")
+        }
+        var args = fixture.args
+        args["request_id"] = .string(UUID().uuidString)
+        args["command"] = .object(["action": .string("click"), "tab_id": .number(1), "element_id": .string("button")])
+        let failure = try await fixture.service.tool("browser_command", arguments: args)
+        XCTAssertEqual(failure["error"], .string("browser_timeout_execution_unknown"))
+        for _ in 0..<5 {
+            var desktop = fixture.args
+            desktop["actions"] = .array([.object(["type": .string("wait"), "milliseconds": .number(0)])])
+            _ = try await fixture.run(desktop)
+        }
+        let replay = try await fixture.service.tool("browser_command", arguments: args)
+        XCTAssertEqual(replay, failure)
+        XCTAssertEqual(calls, 1)
+        fixture.time = fixture.time.addingTimeInterval(601)
+        do { _ = try await fixture.service.tool("browser_command", arguments: args); XCTFail("Expired lease replayed result") }
+        catch { XCTAssertEqual(error.localizedDescription, "control_session_unavailable:lease_expired") }
+        await fixture.manager.stop()
+    }
+    @MainActor func testBrowserReadFailureMetadataSurvivesServiceAndUserExit() async throws {
+        let fixture = try Fixture()
+        defer { fixture.service.browserHandler = nil; fixture.cleanup() }
+        _ = try await fixture.open()
+        let originalMessage = "deadline_exceeded: operation timed out"
+        fixture.service.browserHandler = { _, _ in throw ComputerUseError.detailed("browser_read_timeout", .object([
+            "code": .string("browser_read_timeout"), "message": .string(originalMessage)])) }
+        var args = fixture.args
+        args["request_id"] = .string(UUID().uuidString)
+        args["command"] = .object(["action": .string("observe"), "tab_id": .number(1)])
+        let failure = try await fixture.service.tool("browser_command", arguments: args)
+        XCTAssertEqual(failure["error"], .string("browser_read_timeout"))
+        XCTAssertEqual(failure["error_details"]["input_outcome"], .string("not_attempted"))
+        XCTAssertEqual(failure["error_details"]["read_only"], .bool(true))
+        XCTAssertEqual(failure["error_details"]["max_retries"], .number(1))
+        XCTAssertEqual(failure["error_details"]["message"], .string(originalMessage))
+        let replay = try await fixture.service.tool("browser_command", arguments: args)
+        XCTAssertEqual(replay, failure)
+        fixture.service.browserHandler = { _, _ in
+            fixture.service.endControl(reason: "user_exit")
+            throw ComputerUseError.detailed("browser_timeout_execution_unknown", .object([
+                "input_outcome": .string("unknown"), "retryable": .bool(true), "max_retries": .number(1)]))
+        }
+        args["request_id"] = .string(UUID().uuidString)
+        let exited = try await fixture.service.tool("browser_command", arguments: args)
+        XCTAssertEqual(exited["error_details"]["code"], .string("user_exit"))
+        XCTAssertEqual(exited["error_details"]["read_only"], .bool(true))
+        XCTAssertEqual(exited["error_details"]["input_outcome"], .string("not_attempted"))
+        XCTAssertEqual(exited["error_details"]["retryable"], .bool(false))
+        XCTAssertEqual(exited["error_details"]["max_retries"], .null)
+        XCTAssertEqual(exited["error_details"]["next_step"], .string("wait_for_user_authorization"))
+        await fixture.manager.stop()
+    }
+    @MainActor func testAccessibleActionsUseBoundWindowWithoutInputInjection() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let opened = try await fixture.service.tool("open_computer", arguments: .object([
+            "peer_id": .string("local"), "control_mode": .string("independent")]))
+        fixture.window = "unrelated-user-window"
+        var request: JSONValue = .object(["peer_id": .string("local"), "control_session_id": opened["control_session_id"],
+            "observation_id": opened["observation_id"], "expected_window_id": .string("background-target"),
+            "actions": .array([.object(["type": .string("ax_click"), "element_id": .string("button")]),
+                .object(["type": .string("set_value"), "element_id": .string("field"), "text": .string("")])])])
+        let done = try await fixture.service.tool("computer_action", arguments: request)
+        XCTAssertEqual(done["executed_actions"], .number(2))
+        XCTAssertTrue(fixture.events.isEmpty)
+        XCTAssertEqual(fixture.semanticActions.count, 2)
+        do { _ = try await fixture.service.tool("computer_action", arguments: request); XCTFail("stale observation accepted") }
+        catch { XCTAssertEqual(error.localizedDescription, "observation_id_mismatch") }
+        XCTAssertEqual(fixture.semanticActions.count, 2)
+        request["observation_id"] = done["observation"]["observation_id"]
+        fixture.service.endControl(reason: "user_exit")
+        do { _ = try await fixture.service.tool("computer_action", arguments: request); XCTFail("input after user exit") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("user_exit")) }
+        XCTAssertEqual(fixture.semanticActions.count, 2)
+        await fixture.manager.stop()
+    }
     @MainActor func testNativeResolutionAndExplicitCaps() async throws {
         try ComputerUseService.validateObservationOptions(.object([:]))
         for cap in [0, 1, 1600, 3840, 16384] {
@@ -348,6 +732,7 @@ final class ComputerUseQualityTests: XCTestCase {
     var backgroundMode = false;
     var suspends = 0;
     var restores = 0;
+    var semanticActions: [JSONValue] = []
     var capturedContext: JSONValue = .null;
     var positions: [(Double, Double)] = [];
     var previews: [String] = [];
@@ -412,7 +797,7 @@ final class ComputerUseQualityTests: XCTestCase {
                 }
                 self?.backgroundMode = mode == "independent";
                 return .object(["mode": .string(mode)])
-            })
+            }, accessibilityAction: { [weak self] action in self?.semanticActions.append(action) })
         service.allowComputer = true
     }
     func state() -> JSONValue {

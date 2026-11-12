@@ -61,6 +61,91 @@ class ClientTests(unittest.TestCase):
         self.now = 0
         self.client = ComputerClient(self.backend, clock=lambda: self.now, start_timer=False)
 
+    def test_windows_inventory_does_not_acquire_control(self):
+        self.client.use({'action': 'windows'})
+        self.assertFalse(self.backend.active)
+        self.assertEqual(self.backend.calls[-1], ('get_computer_info', {'peer_id': 'p', 'list_windows': True}))
+
+    def test_explicit_window_binding_is_forwarded_and_retained(self):
+        self.client.use({'control_mode': 'independent', 'window_id': 'win:qa'})
+        opened = next(a for n, a in self.backend.calls if n == 'open_computer')
+        self.assertEqual(opened['window_id'], 'win:qa')
+        self.client.use({'action': 'observe'})
+        self.assertEqual(self.client.states['p']['window_id'], 'win:qa')
+
+    def test_repeating_same_window_binding_does_not_reopen_or_block_click(self):
+        binding = {'computer': 'local', 'window_id': 'win:qa', 'control_mode': 'independent'}
+        self.client.use({**binding, 'action': 'observe', 'text_only': True})
+        self.assertEqual(self.client.states['p']['application'], 'QA')
+        self.client.states['p']['observation']['analysis']['controls']['items'][0]['element_id'] = 'element:qa'
+        self.client.use({**binding, 'action': 'click', 'element_id': 'element:qa'})
+        self.assertEqual(self.backend.actions, [{'type': 'ax_click', 'element_id': 'element:qa'}])
+        self.assertEqual(sum(n == 'open_computer' for n, _ in self.backend.calls), 1)
+        self.assertEqual(sum(n == 'release_input' for n, _ in self.backend.calls), 0)
+
+    def test_changing_explicit_window_still_rebinds_and_drops_old_inferred_app(self):
+        self.client.use({'window_id': 'win:qa', 'control_mode': 'independent', 'text_only': True})
+        self.client.use({'window_id': 'win:other', 'control_mode': 'independent', 'text_only': True})
+        opens = [a for n, a in self.backend.calls if n == 'open_computer']
+        self.assertEqual(len(opens), 2)
+        self.assertEqual(opens[-1]['window_id'], 'win:other')
+        self.assertNotIn('application', opens[-1])
+
+    def test_unsupported_semantic_action_is_rejected_before_open_or_review(self):
+        with self.assertRaisesRegex(ValueError, 'element_id_requires_independent_click_or_set_value'):
+            self.client.use({'window_id': 'win:qa', 'control_mode': 'independent', 'action': 'double_click', 'element_id': 'element:qa'})
+        self.assertFalse(any(n == 'open_computer' for n, _ in self.backend.calls))
+
+    def test_element_action_never_falls_back_to_coordinates(self):
+        self.client.use({'control_mode': 'independent', 'application': 'QA'})
+        self.client.states['p']['observation']['analysis']['controls']['items'][0]['element_id'] = 'element:qa'
+        self.client.use({'action': 'click', 'element_id': 'element:qa'})
+        operation = self.backend.actions[-1]
+        self.assertEqual(operation, {'type': 'ax_click', 'element_id': 'element:qa'})
+
+    def test_bound_text_only_capture_is_retained_for_semantic_action(self):
+        self.client.use({'control_mode': 'independent', 'application': 'QA', 'text_only': True})
+        self.client.states['p']['observation']['analysis']['controls']['items'][0]['element_id'] = 'element:qa'
+        self.client.use({'action': 'click', 'element_id': 'element:qa'})
+        args = next(a for n, a in reversed(self.backend.calls) if n == 'computer_action')
+        self.assertTrue(args['text_only'])
+
+    def test_reopened_text_only_session_requests_controls_review_not_missing_image(self):
+        observe = self.backend.observe
+        def with_element_ids():
+            result = observe()
+            result['result']['structuredContent']['result']['analysis']['controls']['items'][0]['element_id'] = 'fresh:control'
+            return result
+        self.backend.observe = with_element_ids
+        self.client.use({'control_mode': 'independent', 'application': 'QA', 'text_only': True})
+        self.client._release(self.client.states['p'])
+        result = self.client.use({'action': 'click', 'element_id': 'old-reference'})['structuredContent']['result']
+        self.assertEqual(result['status'], 'review_new_controls')
+        self.assertTrue(result['needs_review'])
+        self.assertFalse(result['input_attempted'])
+        self.assertTrue(result['controls'])
+        self.assertEqual(result['next_step'], 'inspect_returned_controls_then_use_fresh_element_id')
+        self.assertFalse(self.backend.actions)
+
+    def test_missing_controls_never_request_nonexistent_element_id(self):
+        state = {'name': 'QA', 'control_mode': 'independent', 'text_only': True, 'report_analysis': True}
+        native = {'structuredContent': {'result': {'screenshot': {'image_omitted': True}, 'analysis': {'controls': {'items': []}}}}}
+        result = self.client._public(state, native, 'review_new_image', True)['structuredContent']['result']
+        self.assertEqual(result['status'], 'review_new_state')
+        self.assertNotEqual(result['next_step'], 'inspect_returned_controls_then_use_fresh_element_id')
+
+    def test_stale_element_is_not_replaced_by_another_control(self):
+        self.client.use({'control_mode': 'independent', 'application': 'QA'})
+        r = self.client.use({'action': 'click', 'element_id': 'element:old'})
+        self.assertEqual(r['structuredContent']['result']['status'], 'element_not_in_latest_observation')
+        self.assertFalse(self.backend.actions)
+
+    def test_set_value_requires_a_semantic_target_and_allows_empty_value(self):
+        self.client.use({'control_mode': 'independent', 'application': 'QA'})
+        self.client.states['p']['observation']['analysis']['controls']['items'][0]['element_id'] = 'element:qa'
+        self.client.use({'action': 'set_value', 'element_id': 'element:qa', 'text': ''})
+        self.assertEqual(self.backend.actions[-1], {'type': 'set_value', 'element_id': 'element:qa', 'text': ''})
+
     def test_read_only_text_does_not_open_or_mutate_frame(self):
         result = self.client.use({'text_only': True})
         value = result['structuredContent']['result']
@@ -219,7 +304,7 @@ class ClientTests(unittest.TestCase):
 
     def test_catalog_and_window_binding(self):
         listed = self.client.dispatch({'id': 1, 'method': 'tools/list', 'params': {}})
-        self.assertEqual([t['name'] for t in listed['result']['tools']], ['computer_use', 'list_computers', 'send_files'])
+        self.assertEqual([t['name'] for t in listed['result']['tools']], ['computer_use', 'browser_use', 'list_computers', 'send_files'])
         self.client.use({'application': 'QA'})
         self.backend.window = {'window_id': 'win:other', 'left': 0, 'top': 0, 'right': 100, 'bottom': 100}
         result = self.client.use({'action': 'click', 'x': 20, 'y': 30})

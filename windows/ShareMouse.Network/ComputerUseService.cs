@@ -18,6 +18,8 @@ public sealed class ComputerUseService : IDisposable
     }
     public bool Controlling => control is not null;
     public JsonNode? ControlContext => control?.ControlContext;
+    public Func<JsonNode, Func<bool>, Task<JsonNode>>? BrowserHandler { get; set; }
+    internal SynchronizationContext BrowserContext => context;
     private readonly string id, name;
     private readonly SessionManager manager;
     private readonly FileTransferService? files;
@@ -32,6 +34,9 @@ public sealed class ComputerUseService : IDisposable
     private readonly Action<ScreenGeometry, double, double, string> marker;
     private readonly Func<ScreenGeometry, double, double, string, int> pointerPreview;
     private readonly Func<string, Task> focusApplication;
+    private readonly Func<JsonNode, JsonNode> prepareControl;
+    private readonly Func<JsonNode> listWindows;
+    private readonly Func<JsonNode, JsonNode, Task> accessibilityAction;
     private readonly Timer watcher;
     private readonly Func<DateTime> utcNow;
     private readonly Action<string> diagnostic;
@@ -46,6 +51,8 @@ public sealed class ComputerUseService : IDisposable
         public readonly ScreenGeometry Screen = screen; public readonly bool RestoreSharing = restoreSharing;
         public double IdleSeconds = IdleTimeoutSeconds; public string? ClientID, ClientName; public readonly DateTime Started = started; public DateTime Expires = started.AddSeconds(IdleTimeoutSeconds); public string Observation = ""; public int Width, Height; public bool Busy; public JsonNode ControlContext = Obj(("mode", "user_mouse")); public JsonNode Region = Obj(("x", 0), ("y", 0), ("width", 1), ("height", 1)); public JsonNode? LastResult, LastCapturedAt; public string? LastWindowID; public string? OpenRequest;
         public readonly Dictionary<string, (string signature, JsonObject result)> Completed = new();
+        public readonly Dictionary<string, (string signature, JsonObject result)> BrowserCompleted = new();
+        public readonly HashSet<string> BrowserRequests = new();
     }
     private Control? control;
     private (string token, string owner, string reason)? lastEnded;
@@ -88,7 +95,7 @@ public sealed class ComputerUseService : IDisposable
     }
     public ComputerUseService(string id, string name, SessionManager manager, FileTransferService? files, ClipboardService clipboard, SynchronizationContext context,
         Func<ScreenGeometry[]> screens, Func<JsonObject> info, Func<ScreenGeometry, Task<JsonObject>> screenshot,
-        Action<CapturedInput, ScreenGeometry?, double, double> inject, Func<bool> suspend, Action<bool> restore, Func<bool> canControl, Action<ScreenGeometry, double, double, string>? marker = null, Func<DateTime>? utcNow = null, Action<string>? diagnostic = null, Action<bool, string>? controlChanged = null, Action? activity = null, Func<JsonObject>? inputState = null, Func<ScreenGeometry, JsonNode, Func<bool>, Task<JsonObject>>? captureWithOptions = null, Func<ScreenGeometry, double, double, string, int>? pointerPreview = null, Func<string, Task>? focusApplication = null)
+        Action<CapturedInput, ScreenGeometry?, double, double> inject, Func<bool> suspend, Action<bool> restore, Func<bool> canControl, Action<ScreenGeometry, double, double, string>? marker = null, Func<DateTime>? utcNow = null, Action<string>? diagnostic = null, Action<bool, string>? controlChanged = null, Action? activity = null, Func<JsonObject>? inputState = null, Func<ScreenGeometry, JsonNode, Func<bool>, Task<JsonObject>>? captureWithOptions = null, Func<ScreenGeometry, double, double, string, int>? pointerPreview = null, Func<string, Task>? focusApplication = null, Func<JsonNode, JsonNode>? prepareControl = null, Func<JsonNode>? listWindows = null, Func<JsonNode, JsonNode, Task>? accessibilityAction = null)
     {
         this.id = id;
         this.name = name;
@@ -112,6 +119,9 @@ public sealed class ComputerUseService : IDisposable
         this.captureWithOptions = captureWithOptions;
         this.pointerPreview = pointerPreview ?? ((_, _, _, _) => 0);
         this.focusApplication = focusApplication ?? (_ => throw new IOException("application_focus_unavailable"));
+        this.prepareControl = prepareControl ?? (args => args["control_mode"] is null || S(args, "control_mode") == "user_mouse" ? Obj(("mode", "user_mouse")) : throw new IOException("control_mode_unsupported"));
+        this.listWindows = listWindows ?? (() => new JsonArray());
+        this.accessibilityAction = accessibilityAction ?? ((_, _) => throw new IOException("accessibility_action_unavailable"));
         watcher = new Timer(_ => context.Post(_ => Tick(), null), null, Timeout.Infinite, Timeout.Infinite);
     }
     private Task<T> OnUI<T>(Func<Task<T>> work)
@@ -328,6 +338,11 @@ public sealed class ComputerUseService : IDisposable
             await Task.Delay(60000);
             if (pending.Remove(request, out var p))
             {
+                if (operation == "browser" && a["command"] is { } command && BrowserBroker.IsReadOnly(command))
+                {
+                    p.Result.TrySetException(BrowserBroker.Failure("remote_timeout_execution_unknown", command, true));
+                    return;
+                }
                 if (p.Operation == "open")
                     _ = CancelOpen();
                 async Task CancelOpen()
@@ -425,6 +440,7 @@ public sealed class ComputerUseService : IDisposable
     private Task<JsonObject> Capture(Control c, JsonNode options)
     {
         var adjusted = (JsonObject)options.DeepClone();
+        adjusted["_control_context"] = c.ControlContext.DeepClone();
         var peer = manager.CurrentSessions().FirstOrDefault(s => s.PeerID == c.Owner);
         if (peer is not null && peer.Capabilities.Contains("ble") && !peer.Capabilities.Contains("tcp") && !peer.Capabilities.Contains("quic"))
             adjusted["_transport_jpeg"] = true;
@@ -447,9 +463,9 @@ public sealed class ComputerUseService : IDisposable
         if (state is not null)
         {
             state["cursor_position_screenshot"] = MapCursor(state["cursor_position"], image);
-            c.LastWindowID = state["foreground_window"]?["window_id"]?.GetValue<string>();
+            c.LastWindowID = (state["control_target_window"] ?? state["foreground_window"])?["window_id"]?.GetValue<string>();
         }
-        return Obj(("peer_id", id), ("control_session_id", c.Token), ("screen_id", c.Screen.Id), ("observation_id", c.Observation), ("screenshot", image), ("control_mode", "user_mouse"), ("input_sharing_isolated", true), ("coordinate_space", "screenshot_pixels"), ("coordinate_transform", Coordinates(image)), ("input_state", state), ("analysis", image["analysis"]), ("observation_duration_ms", started.Elapsed.TotalMilliseconds), ("control_session_idle_timeout_ms", c.IdleSeconds * 1000), ("control_session_expires_at", c.Expires.ToString("O")));
+        return Obj(("peer_id", id), ("control_session_id", c.Token), ("screen_id", c.Screen.Id), ("observation_id", c.Observation), ("screenshot", image), ("control_mode", c.ControlContext["mode"]), ("input_sharing_isolated", true), ("coordinate_space", "screenshot_pixels"), ("coordinate_transform", Coordinates(image)), ("input_state", state), ("analysis", image["analysis"]), ("observation_duration_ms", started.Elapsed.TotalMilliseconds), ("control_session_idle_timeout_ms", c.IdleSeconds * 1000), ("control_session_expires_at", c.Expires.ToString("O")));
     }
     private async Task<JsonNode> Execute(string operation, JsonNode a, string owner, string? requestID = null)
     {
@@ -465,6 +481,11 @@ public sealed class ComputerUseService : IDisposable
             result["allow_computer"] = AllowComputer;
             result["allow_files"] = AllowFiles;
             result["control_state"] = ControlState(owner, result);
+            if (Flag(a, "list_windows"))
+            {
+                if (!AllowComputer) throw new IOException("computer_access_disabled");
+                result["windows"] = listWindows();
+            }
             if (Flag(a, "read_screen"))
             {
                 if (!AllowComputer)
@@ -540,12 +561,12 @@ public sealed class ComputerUseService : IDisposable
                 var idleMilliseconds = Integer(a, "control_session_idle_timeout_ms", IdleTimeoutSeconds * 1000, 15000, 600000);
                 PruneUnavailableControl();
                 EnsureCanOpen(owner);
-                if (a["control_mode"] is not null && S(a, "control_mode") != "user_mouse")
-                    throw new IOException("control_mode_unsupported");
+                var prepared = prepareControl(a);
                 var selected = a["screen_id"] is { } requested ? screens().FirstOrDefault(s => s.Id == requested.GetValue<string>()) : screens().FirstOrDefault(s => s.Primary) ?? screens().FirstOrDefault();
                 if (selected is null)
                     throw new IOException("screen_unavailable");
                 control = new(Guid.NewGuid().ToString("D"), owner, manager.CurrentSessions().FirstOrDefault(s => s.PeerID == owner)?.SessionID, selected, suspend(), utcNow());
+                control.ControlContext = prepared;
                 if (requestID is not null && manager.CurrentSessions().FirstOrDefault(s => s.PeerID == owner)?.Capabilities.Contains("computer-open-ack-v1") == true)
                     control.OpenRequest = requestID;
                 if (a["control_session_idle_timeout_ms"] is not null)
@@ -575,6 +596,8 @@ public sealed class ComputerUseService : IDisposable
                 return Obj(("closed", true));
             case "actions":
                 return await Actions(a, owner);
+            case "browser":
+                return await Browser(a, owner);
             default:
                 throw new IOException("unknown_operation");
         }
@@ -585,12 +608,69 @@ public sealed class ComputerUseService : IDisposable
         result["control_session_id"] = token;
         return result;
     }
+    private async Task<JsonObject> Browser(JsonNode a, string owner)
+    {
+        var c = Checked(a, owner);
+        var request = S(a, "request_id");
+        if (!Guid.TryParse(request, out _)) throw new IOException("request_id_must_be_uuid");
+        var command = a["command"] ?? throw new IOException("invalid_browser_command");
+        BrowserBroker.Validate(command);
+        var orderedCommand = new JsonObject();
+        foreach (var field in ((JsonObject)command).OrderBy(field => field.Key, StringComparer.Ordinal))
+            orderedCommand[field.Key] = field.Value?.DeepClone();
+        var signature = Obj(("browser", orderedCommand)).ToJsonString();
+        if (c.BrowserCompleted.TryGetValue(request, out var cached))
+        {
+            if (cached.signature != signature) throw new IOException("request_id_reused_with_different_actions");
+            return (JsonObject)cached.result.DeepClone();
+        }
+        if (c.Busy) throw new IOException("computer_busy");
+        if (c.Completed.ContainsKey(request)) throw new IOException("request_id_reused_with_different_actions");
+        if (c.BrowserRequests.Contains(request)) throw new IOException("browser_request_result_expired");
+        if (c.BrowserRequests.Count >= 4096) throw new IOException("browser_request_limit_reached");
+        var handler = BrowserHandler ?? throw new IOException("browser_extension_unavailable");
+        c.BrowserRequests.Add(request);
+        c.Busy = true;
+        c.Expires = utcNow().AddSeconds(Math.Max(c.IdleSeconds, 30));
+        var result = Obj(("peer_id", id), ("control_session_id", c.Token), ("request_id", request));
+        try
+        {
+            result["browser"] = (await handler(command, () => { try { Checked(a, owner); return true; } catch { return false; } }))?.DeepClone();
+            Checked(a, owner);
+        }
+        catch (Exception error)
+        {
+            // Cache failures too: an unknown outcome must never trigger the same command again.
+            var readOnly = BrowserBroker.IsReadOnly(command);
+            var message = ErrorDetails(error)["message"]?.GetValue<string>() ?? error.Message;
+            var failure = readOnly && BrowserBroker.IsTimeout(error.Message) ? BrowserBroker.Failure(message, command, true) : error;
+            try { Checked(a, owner); } catch (Exception ended) { failure = ended; }
+            result["browser"] = null;
+            result["error"] = failure.Message;
+            var details = ErrorDetails(failure);
+            details["read_only"] = readOnly;
+            if (readOnly) details["input_outcome"] = "not_attempted";
+            else if (ErrorDetails(error)["input_outcome"] is { } outcome) details["input_outcome"] = outcome.DeepClone();
+            result["error_details"] = details;
+        }
+        if (control?.Token == c.Token && control.Owner == owner)
+        {
+            c.Busy = false;
+            c.Expires = utcNow().AddSeconds(c.IdleSeconds);
+            result["control_session_expires_at"] = c.Expires.ToString("O");
+            c.LastResult = result.DeepClone();
+            c.BrowserCompleted[request] = (signature, (JsonObject)result.DeepClone());
+            if (c.BrowserCompleted.Count > 64) c.BrowserCompleted.Remove(c.BrowserCompleted.Keys.First());
+        }
+        return result;
+    }
     private async Task<JsonObject> Actions(JsonNode a, string owner)
     {
         var c = Checked(a, owner);
         var request = a["request_id"]?.GetValue<string>() ?? Guid.NewGuid().ToString("D");
         if (!Guid.TryParse(request, out _))
             throw new IOException("request_id_must_be_uuid");
+        if (c.BrowserRequests.Contains(request)) throw new IOException("request_id_reused_with_different_actions");
         var body = (JsonObject)a.DeepClone();
         foreach (var key in new[] { "peer_id", "control_session_id", "observation_id", "request_id" })
             body.Remove(key);
@@ -685,7 +765,10 @@ public sealed class ComputerUseService : IDisposable
     }
     private void CheckWindow(string? expected, bool allow = false)
     {
-        if (expected is not null && !allow && inputState?.Invoke()["foreground_window"]?["window_id"]?.GetValue<string>() != expected)
+        if (expected is null || allow) return;
+        var state = inputState?.Invoke();
+        var window = control?.ControlContext["mode"]?.GetValue<string>() == "independent" ? state?["control_target_window"] : state?["foreground_window"];
+        if (window?["window_id"]?.GetValue<string>() != expected)
             throw new IOException("target_window_changed");
     }
     private async Task CheckedDelay(int milliseconds, Control c, string? expected = null)
@@ -716,8 +799,17 @@ public sealed class ComputerUseService : IDisposable
     private static readonly HashSet<string> Keys = new(Enumerable.Range(65, 26).Select(i => "Key" + (char)i).Concat(Enumerable.Range(0, 10).Select(i => "Digit" + i)).Concat(Enumerable.Range(1, 12).Select(i => "F" + i)).Concat(new[] { "Enter", "Tab", "Space", "Backspace", "Escape", "Delete", "Home", "End", "PageUp", "PageDown", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "ShiftLeft", "ShiftRight", "MetaLeft", "MetaRight", "Minus", "Equal", "BracketLeft", "BracketRight", "Backslash", "Semicolon", "Quote", "Comma", "Period", "Slash", "Backquote" }));
     private static void Validate(JsonNode a, Control c)
     {
+        if (c.ControlContext["mode"]?.GetValue<string>() == "independent" && S(a, "type") is not ("ax_click" or "set_value" or "wait"))
+            throw new IOException("independent_action_requires_accessible_element");
         switch (S(a, "type"))
         {
+            case "ax_click":
+            case "set_value":
+                if (c.ControlContext["mode"]?.GetValue<string>() != "independent" || S(a, "element_id").Length > 512)
+                    throw new IOException("accessible_element_required");
+                if (S(a, "type") == "set_value" && (a["text"] is not JsonValue t || !t.TryGetValue<string>(out var text) || System.Text.Encoding.UTF8.GetByteCount(text) > 131072))
+                    throw new IOException("invalid_text");
+                break;
             case "click":
             case "double_click":
             case "move":
@@ -789,6 +881,12 @@ public sealed class ComputerUseService : IDisposable
         };
         switch (S(a, "type"))
         {
+            case "ax_click":
+            case "set_value":
+                injectionAttempted = true;
+                await accessibilityAction(a, c.ControlContext);
+                successfulInjectionCalls++;
+                break;
             case "move":
                 await Preview(a, c, expected);
                 Move(a, c, "move");
@@ -912,6 +1010,7 @@ public sealed class ComputerUseService : IDisposable
             "open_computer" => "open",
             "observe_computer" => "observe",
             "computer_action" => "actions",
+            "browser_command" => "browser",
             "release_input" or "close_computer" => "close",
             "list_transfers" or "get_transfer" => "transfers",
             "control_transfer" => "transfer_action",

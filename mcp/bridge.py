@@ -8,6 +8,9 @@ from pathlib import Path
 import sys
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
+# The installed bridge lives inside the signed macOS app's sealed resources.
+# Imports must never add bytecode files to that bundle.
+sys.dont_write_bytecode = True
 from computer_client import ComputerClient
 
 

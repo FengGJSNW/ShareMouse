@@ -561,7 +561,8 @@ import SwiftUI
                 prepareControl: { try self.computerAdapter.prepareControl($0) },
                 validatePlatformAction: {
                     try self.computerAdapter.validatePlatformAction($0, screen: $1, x: $2, y: $3)
-                })
+                }, listWindows: { self.computerAdapter.listWindows() },
+                accessibilityAction: { try self.computerAdapter.accessibilityAction($0) })
             self.notifications.exitMCPControl = { [weak self] in self?.exitMCPControl() }
             self.computer = computer
             computer.allowComputer = preferences.allowComputerUse;

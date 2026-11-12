@@ -9,6 +9,21 @@ import Vision
     private var independentKeys = Set<String>(), independentButtons = Set<Int>()
     var defaultControlMode = "user_mouse"
     var independent: Bool { activeControl["mode"].string == "independent" }
+    func listWindows() -> JSONValue {
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        return .array(windows.compactMap { window in
+            guard (window[kCGWindowLayer as String] as? Int) == 0,
+                let pid = window[kCGWindowOwnerPID as String] as? Int,
+                let number = window[kCGWindowNumber as String] as? Int,
+                let app = NSRunningApplication(processIdentifier: pid_t(pid)), app.activationPolicy == .regular,
+                let box = window[kCGWindowBounds as String] as? [String: Double],
+                let x = box["X"], let y = box["Y"], let w = box["Width"], let h = box["Height"], w > 0, h > 0 else { return nil }
+            return .object(["window_id": .string("mac:\(pid):\(number)"), "process_id": .number(Double(pid)),
+                "process_name": .string(app.localizedName ?? ""), "bundle_id": .string(app.bundleIdentifier ?? ""),
+                "title": .string(window[kCGWindowName as String] as? String ?? ""),
+                "left": .number(x), "top": .number(y), "right": .number(x + w), "bottom": .number(y + h)])
+        })
+    }
     func prepareControl(_ args: JSONValue) throws -> JSONValue {
         let mode = args["control_mode"].string ?? defaultControlMode
         guard ["user_mouse", "independent"].contains(mode) else {
@@ -17,6 +32,12 @@ import Vision
         if mode == "user_mouse" { return .object(["mode": .string(mode)]) }
         guard AXIsProcessTrusted() else { throw ComputerUseError.message("input_permission_missing") }
         let query = args["application"].string?.lowercased()
+        if let requested = args["window_id"].string {
+            guard let window = listWindows().array.first(where: { $0["window_id"].string == requested }),
+                query == nil || window["process_name"].string?.lowercased() == query || window["bundle_id"].string?.lowercased() == query,
+                let number = requested.split(separator: ":").last.flatMap({ Double($0) }) else { throw ComputerUseError.message("application_window_unavailable") }
+            return .object(["mode": .string(mode), "process_id": window["process_id"], "window_number": .number(number), "application": window["process_name"]])
+        }
         let apps = NSWorkspace.shared.runningApplications.filter { app in
             app.activationPolicy == .regular
                 && (query == nil
@@ -30,11 +51,12 @@ import Vision
         let windows =
             CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
             as? [[String: Any]] ?? []
-        guard
-            let window = windows.first(where: {
+        let matches = windows.filter {
                 ($0[kCGWindowOwnerPID as String] as? Int) == Int(app.processIdentifier)
                     && ($0[kCGWindowLayer as String] as? Int) == 0
-            }), let number = window[kCGWindowNumber as String] as? Int
+            }
+        guard matches.count <= 1 else { throw ComputerUseError.message("application_window_ambiguous:use_windows_then_window_id") }
+        guard let window = matches.first, let number = window[kCGWindowNumber as String] as? Int
         else { throw ComputerUseError.message("application_window_unavailable") }
         let context: JSONValue = .object([
             "mode": .string(mode), "process_id": .number(Double(app.processIdentifier)),
@@ -68,6 +90,7 @@ import Vision
     func beginControl(_ context: JSONValue) {
         activeControl = context;
         logicalTextTarget = nil;
+        semanticElements.removeAll()
         independentKeys = [];
         independentButtons = []
         if let snapshot = try? target(context) {
@@ -85,6 +108,67 @@ import Vision
         }
     }
     private var logicalTextTarget: AXUIElement?
+    private var semanticElements: [String: AXUIElement] = [:]
+    private func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
+        var value: CFTypeRef?
+        return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success ? value : nil
+    }
+    static func windowMatchIndex(_ candidates: [(bounds: CGRect, title: String?)], bounds: CGRect, title: String) -> Int? {
+        let matches = candidates.indices.filter { index in
+            let candidate = candidates[index].bounds
+            return abs(candidate.minX - bounds.minX) < 2 && abs(candidate.minY - bounds.minY) < 2
+                && abs(candidate.width - bounds.width) < 2 && abs(candidate.height - bounds.height) < 2
+        }
+        // Browser AX and WindowServer titles can differ even for the same window.
+        if matches.count == 1 { return matches[0] }
+        guard !title.isEmpty else { return nil }
+        let titled = matches.filter { candidates[$0].title == title }
+        return titled.count == 1 ? titled[0] : nil
+    }
+    private func boundAXWindow(_ context: JSONValue) throws -> AXUIElement {
+        let snapshot = try target(context)
+        let pid = pid_t(context["process_id"].number!)
+        let root = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(root, 0.1)
+        let candidates = (attribute(root, kAXWindowsAttribute) as? [AXUIElement] ?? []).compactMap { element -> (element: AXUIElement, bounds: CGRect, title: String?)? in
+            var owner: pid_t = 0
+            guard AXUIElementGetPid(element, &owner) == .success, owner == pid,
+                let raw = attribute(element, kAXPositionAttribute), let rawSize = attribute(element, kAXSizeAttribute),
+                CFGetTypeID(raw) == AXValueGetTypeID(), CFGetTypeID(rawSize) == AXValueGetTypeID() else { return nil }
+            var p = CGPoint.zero; var size = CGSize.zero
+            guard AXValueGetValue(raw as! AXValue, .cgPoint, &p), AXValueGetValue(rawSize as! AXValue, .cgSize, &size) else { return nil }
+            return (element, CGRect(origin: p, size: size), attribute(element, kAXTitleAttribute) as? String)
+        }
+        guard let index = Self.windowMatchIndex(candidates.map { ($0.bounds, $0.title) }, bounds: snapshot.bounds,
+            title: snapshot.window["title"].string ?? "") else { throw ComputerUseError.message("target_window_accessibility_unavailable") }
+        return candidates[index].element
+    }
+    private func requireBound(_ element: AXUIElement) throws {
+        let window = try boundAXWindow(activeControl)
+        var current = element
+        for _ in 0..<40 {
+            if CFEqual(current, window) { return }
+            guard let parent = attribute(current, kAXParentAttribute), CFGetTypeID(parent) == AXUIElementGetTypeID() else { break }
+            current = parent as! AXUIElement
+        }
+        throw ComputerUseError.message("element_outside_bound_window_or_stale")
+    }
+    func accessibilityAction(_ action: JSONValue) throws {
+        guard independent, let id = action["element_id"].string, let element = semanticElements[id] else { throw ComputerUseError.message("accessible_element_stale") }
+        try requireBound(element)
+        guard attribute(element, kAXEnabledAttribute) as? Bool != false else { throw ComputerUseError.message("accessible_element_disabled") }
+        AXUIElementSetMessagingTimeout(element, 0.8)
+        if action["type"].string == "set_value" {
+            guard editable(element), let text = action["text"].string else { throw ComputerUseError.message("accessible_value_not_settable") }
+            guard AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, text as CFString) == .success else { throw ComputerUseError.message("background_text_rejected") }
+        } else if editable(element) {
+            logicalTextTarget = element
+        } else {
+            let target = try pressTarget(element)
+            try requireBound(target)
+            guard AXUIElementPerformAction(target, kAXPressAction as CFString) == .success else { throw ComputerUseError.message("background_click_rejected") }
+        }
+    }
     private func backgroundElement(at point: CGPoint) throws -> AXUIElement {
         guard let pid = activeControl["process_id"].number else {
             throw ComputerUseError.message("independent_target_missing")
@@ -95,11 +179,13 @@ import Vision
         guard AXUIElementCopyElementAtPosition(root, Float(point.x), Float(point.y), &element) == .success, let element
         else { throw ComputerUseError.message("background_click_requires_accessible_control") }
         AXUIElementSetMessagingTimeout(element, 0.08);
+        try requireBound(element)
         return element
     }
     private func editable(_ element: AXUIElement) -> Bool {
         var available = DarwinBoolean(false)
-        return AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &available) == .success
+        return attribute(element, kAXValueAttribute) is String
+            && AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &available) == .success
             && available.boolValue
     }
     private func pressTarget(_ element: AXUIElement) throws -> AXUIElement {
@@ -122,6 +208,11 @@ import Vision
     }
     func validatePlatformAction(_ action: JSONValue, screen: ScreenGeometry, x: Double, y: Double) throws {
         guard independent else { return }
+        if ["ax_click", "set_value"].contains(action["type"].string ?? "") {
+            guard let id = action["element_id"].string, let element = semanticElements[id] else { throw ComputerUseError.message("accessible_element_stale") }
+            try requireBound(element)
+            return
+        }
         if action["type"].string == "click" {
             guard let id = UInt32(screen.id.split(separator: ":").last ?? "") else {
                 throw ComputerUseError.message("screen_unavailable")
@@ -168,6 +259,7 @@ import Vision
             guard let element = logicalTextTarget, editable(element) else {
                 throw ComputerUseError.message("background_text_target_unavailable")
             }
+            try requireBound(element)
             var value: CFTypeRef?
             guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success,
                 let text = value as? String, text.utf8.count <= 131072
@@ -251,6 +343,24 @@ import Vision
     func capture(_ screen: ScreenGeometry) async throws -> JSONValue {
         try await capture(screen, options: .object([:]), shouldContinue: { true })
     }
+    static func captureBounds(_ region: JSONValue, screen: CGRect, window: CGRect?) throws -> CGRect {
+        // Keep uncropped native bounds exact instead of round-tripping through normalized coordinates.
+        if region == .null { return window ?? screen }
+        let bounds = CGRect(
+            x: screen.minX + region["x"].number! * screen.width,
+            y: screen.minY + region["y"].number! * screen.height,
+            width: region["width"].number! * screen.width, height: region["height"].number! * screen.height)
+        guard let window else { return bounds }
+        // Only absorb floating-point arithmetic error; a real sub-point escape is still rejected.
+        let scale = max(1, abs(screen.minX), abs(screen.maxX), abs(screen.minY), abs(screen.maxY),
+            abs(window.minX), abs(window.maxX), abs(window.minY), abs(window.maxY))
+        let tolerance = scale.ulp * 8
+        let clipped = bounds.intersection(window)
+        guard bounds.minX >= window.minX - tolerance, bounds.minY >= window.minY - tolerance,
+            bounds.maxX <= window.maxX + tolerance, bounds.maxY <= window.maxY + tolerance,
+            !clipped.isEmpty else { throw ComputerUseError.message("capture_region_outside_target_window") }
+        return clipped
+    }
     func capture(_ screen: ScreenGeometry, options: JSONValue, shouldContinue: @escaping @MainActor () -> Bool)
         async throws -> JSONValue
     {
@@ -271,10 +381,7 @@ import Vision
             "height": .number(fullBounds.height / screenBounds.height),
         ])
         let roi = options["capture_region"] == .null ? defaultROI : options["capture_region"]
-        let bounds = CGRect(
-            x: screenBounds.minX + roi["x"].number! * screenBounds.width,
-            y: screenBounds.minY + roi["y"].number! * screenBounds.height,
-            width: roi["width"].number! * screenBounds.width, height: roi["height"].number! * screenBounds.height)
+        let bounds = try Self.captureBounds(options["capture_region"], screen: screenBounds, window: independentWindow?.bounds)
         let nativeWidth = CGDisplayCopyDisplayMode(displayID)?.pixelWidth ?? CGDisplayPixelsWide(displayID),
             nativeHeight = CGDisplayCopyDisplayMode(displayID)?.pixelHeight ?? CGDisplayPixelsHigh(displayID)
         let maximum = Int(options["thumbnail_max_dimension"].number ?? options["max_dimension"].number ?? 0)
@@ -328,9 +435,6 @@ import Vision
         if let independentWindow {
             guard let window = content.windows.first(where: { Double($0.windowID) == context["window_number"].number })
             else { throw ComputerUseError.message("application_window_unavailable") }
-            guard independentWindow.bounds.contains(bounds) else {
-                throw ComputerUseError.message("capture_region_outside_target_window")
-            }
             filter = SCContentFilter(desktopIndependentWindow: window);
             config.ignoreShadowsSingleWindow = true;
             config.showsCursor = false
@@ -673,6 +777,7 @@ import Vision
         -> JSONValue
     {
         let context = options["_control_context"]
+        semanticElements.removeAll()
         let application =
             context["mode"].string == "independent"
             ? NSRunningApplication(processIdentifier: pid_t(context["process_id"].number ?? 0))
@@ -724,22 +829,11 @@ import Vision
             return result
         }
         var queue: [(AXUIElement, Int?, Int)] = []
-        if context["mode"].string == "independent", let target = try? target(context),
-            let windows = attribute(root, kAXWindowsAttribute) as? [AXUIElement]
-        {
-            let matches = windows.filter { element in
-                guard let raw = attribute(element, kAXPositionAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else {
-                    return false
-                };
-                var p = CGPoint.zero;
-                return AXValueGetValue(raw as! AXValue, .cgPoint, &p) && abs(p.x - target.bounds.minX) < 2
-                    && abs(p.y - target.bounds.minY) < 2
-            }
-            if matches.count == 1 {
-                queue = [(matches[0], nil, 0)]
-            } else {
+        if context["mode"].string == "independent" {
+            guard let window = try? boundAXWindow(context) else {
                 return .object(["status": .string("target_window_accessibility_unavailable")])
             }
+            queue = [(window, nil, 0)]
         } else if let focused = attribute(root, kAXFocusedWindowAttribute) {
             queue = [(focused as! AXUIElement, nil, 0)]
         }
@@ -755,6 +849,14 @@ import Vision
             if var value = item(element) {
                 let index = tree.count;
                 value["node_id"] = .number(Double(index));
+                if context["mode"].string == "independent" {
+                    let id = UUID().uuidString
+                    semanticElements[id] = element
+                    value["element_id"] = .string(id)
+                    var actions: CFArray?
+                    _ = AXUIElementCopyActionNames(element, &actions)
+                    value["actions"] = .array(((actions as? [String] ?? []).contains(kAXPressAction) || editable(element) ? [JSONValue.string("click")] : []) + (editable(element) ? [.string("set_value")] : []))
+                }
                 value["parent_id"] = parent.map { .number(Double($0)) } ?? .null;
                 value["depth"] = .number(Double(depth));
                 tree.append(value);

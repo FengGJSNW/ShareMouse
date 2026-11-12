@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>ShareMouse DOM fixture</title>
+<style>body { font: 16px system-ui; margin: 2rem; } label, button, iframe { margin: .5rem; } main { display: grid; gap: 1rem; max-width: 50rem; } output { white-space: pre-wrap; }</style>
+<main>
+  <h1>ShareMouse DOM fixture</h1>
+  <form onsubmit="event.preventDefault(); record('submit')">
+    <label>Name <input id="name" autocomplete="off"></label>
+    <label>Secret <input type="password" value="fixture-password"></label>
+    <label>Choice <select><option value="a">Alpha</option><option value="b">Beta</option><option value="off" disabled>Disabled</option></select></label>
+    <label>Ready <input type="checkbox"></label>
+    <button type="submit">Submit fixture</button>
+  </form>
+  <div contenteditable="true" role="textbox" aria-label="Editor">Editable fixture</div>
+  <div><button type="button" onclick="record('click')">Click fixture</button><button disabled>Disabled fixture</button></div>
+  <div><button>Duplicate</button><button>Duplicate</button></div>
+  <div id="shadow"></div>
+  <iframe title="Same-origin fixture" srcdoc="<label>Frame field<input></label><button onclick='this.textContent = &quot;Frame clicked&quot;'>Frame click</button>"></iframe>
+  <output id="events" aria-label="Event log">No actions yet</output>
+</main>
+<script>
+  const log = [];
+  function record(value) { log.push(value); document.getElementById('events').textContent = log.join('\n'); }
+  document.getElementById('shadow').attachShadow({mode:'open'}).innerHTML = '<button>Shadow button</button>';
+  document.addEventListener('input', event => record(`input ${event.target.id || event.target.type || event.target.tagName} isTrusted=${event.isTrusted}`));
+  document.addEventListener('keydown', event => record(`keydown ${event.key} isTrusted=${event.isTrusted}`));
+</script>
+</html>

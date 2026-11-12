@@ -1,10 +1,10 @@
 param(
- [string]$ReleaseVersion='v0.1.0-alpha.3',
- [int]$BuildNumber=37,
+ [string]$ReleaseVersion='v0.1.0',
+ [int]$BuildNumber=44,
  [Parameter(Mandatory=$true)][string]$ISCC
 )
 $ErrorActionPreference='Stop'
-if($ReleaseVersion -notmatch '^v?\d+\.\d+\.\d+-(alpha|beta|rc)\.\d+$' -or $BuildNumber -lt 1 -or $BuildNumber -gt 65535){throw 'Invalid release version/build'}
+if($ReleaseVersion -notmatch '^v?\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$' -or $BuildNumber -lt 1 -or $BuildNumber -gt 65535){throw 'Invalid release version/build'}
 $root=Split-Path $PSScriptRoot -Parent
 $release=Join-Path $root ('artifacts\releases\'+$ReleaseVersion)
 $publish=Join-Path $release 'windows-x64'

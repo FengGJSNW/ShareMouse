@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "ShareMouse Browser Bridge",
+  "version": "1.0.2",
+  "minimum_chrome_version": "106",
+  "description": "Explicit-tab DOM observations and semantic actions through the local ShareMouse native host.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqCwwKJ97EpS6fDSAeVSzF8yvZ3zxHAKEhByMs1cLV907pOYGj1SryvY5MZwFz0nI7VZt/wYq8sxRfYK0iYBu3cTfDteM+3sX0cCelypECMmM6Du3GK7LQR2CD92DG1IdTpQwHjdqz1eDBnprDhyxK4X7Xec37QA7shh5JpL4f8Wc3mEWlpssMRAgvYC0oRRp2C30516RZj5ovbT8GQ8/G4HBSSalqVh9cSSp5/pcybwzdSmWWCePa5fBoLUfXEdekHYc/FaAsVS9N7RZ2Z9t74UDDzAGJhZkbO4qEoxsFm+9584aPyWbuPUlLOFzE0vFmd3uFJHCimUfAlN6RBOZ9QIDAQAB",
+  "permissions": ["nativeMessaging", "tabs", "scripting", "alarms"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.mjs", "type": "module" },
+  "action": { "default_title": "ShareMouse browser bridge: click to reconnect" }
+}

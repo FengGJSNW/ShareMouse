@@ -49,6 +49,7 @@ if (args.Contains("--windows-input-status-check"))
     return;
 }
 if (args.Contains("--computer-use-quality-regression")) { await ComputerUseQualityRegression.Run(); return; }
+if (args.Contains("--browser-regression")) { await BrowserRegression.Run(); return; }
 if (args.Contains("--computer-use-regression")) { await ComputerUseRegression.Run(); return; }
 if (args.Contains("--repeated-approval-regression")) { await SharingRegression.CheckRepeatedApproval(); return; }
 if (args.Contains("--bulk-route-regression")) { await SharingRegression.CheckBulkRoute(); return; }

@@ -2,6 +2,66 @@
 
 将已配对的 Mac / Windows 桌面提供给 MCP 客户端。MCP 服务嵌入原生应用；`bridge.py` 与 `computer_client.py` 提供 stdio 接入和状态封装；截图、输入、配对仍由原生应用执行。
 
+## Edge 网页控件（MCP 1.5.4 / build 44）
+
+使用 `browser_use` 读取网页 DOM 控件树并按控件操作，不注入系统鼠标输入，也不主动调用标签激活接口；网页或浏览器仍可能改变焦点/活动标签，不能承诺前台完全隔离。先列出标签页，再明确指定 `tab_id`；后续调用保留该绑定，关闭或导航后不会自动选另一个标签页。
+
+```json
+{"computer":"windows","action":"tabs"}
+{"action":"observe","tab_id":123}
+{"action":"fill","element_id":"本次观察返回的 ID","text":"完整替换值"}
+{"action":"observe"}
+{"action":"click","role":"button","name":"精确名称"}
+{"action":"navigate","url":"https://github.com"}
+{"action":"release"}
+```
+
+这些示例调用的是 `browser_use`。`observe` 返回 `nodes`，每项含 `element_id`、`parent_id`、role/name、可用动作和值/状态；默认150节点，可用 `max_nodes` 调至1–500。支持 `click`、`fill`（含清空）、`select`（option value）、`check`（目标布尔值）及有限 `press`（Enter、Tab、Shift+Tab、Escape）。每次观察生成新引用；动作使本次引用失效，再观察后继续。也可用精确 `role` + `name`，同名或扫描不完整拒绝执行。动作返回 `applied` 仅代表已调用页面操作，网站最终效果需要再次观察核实。
+
+先在两端运行 `python3 mcp/install_browser_host.py`（Windows使用已安装的Python），在用户实际使用的 Edge 配置中，再到 `edge://extensions` 开启开发人员模式、加载脚本打印的扩展目录。固定扩展ID为 `cdocbfpfceafibeokdomcpmeinlinikf`，宿主为 `com.sharemouse.browser`。脚本只注册当前用户Native Messaging宿主，复制本扩展文件，不改浏览器策略或个人配置。它依赖所选Python路径；Python移动后需重跑安装器。更新扩展代码后重载扩展并刷新此前已观察的页面。卸载时从Edge删除该扩展，并删除本宿主manifest/Windows同名HKCU注册键即可。
+
+**Edge 尚未运行时**：Windows桌面本身也是可绑定窗口，通常叫`Program Manager`。先用`computer_use windows`找到它，再以`independent`、`text_only`绑定其`window_id`，查找用户实际Edge快捷方式；若控件提供`click`，调用新鲜`element_id`后核对Edge是否真的打开。此路线不移动鼠标，但窗口启动可能改变前台。若快捷方式无法通过控件访问，`user_mouse`桌面观察与纯键盘启动本身也不移动指针，但需要前台/输入接管；只有没有特殊启动配置时才使用Win+R输入`msedge`。禁止前台变化的任务应报告无法启动。释放桌面接管后再`browser_use tabs`绑定网页，不静默退回坐标鼠标。
+
+`tabs`额外返回`status`、`frozen`、`discarded`；浏览器未提供时明确为unknown/null。冻结或已卸载的标签无法直接执行DOM动作，会及时返回具体错误。任务若已允许替换该页面，可显式`navigate`到目标URL后再观察；导航会丢失未保存的页面状态，不自动导航或激活标签。页面持续加载时注入不再等到document_idle，但仍固定目标documentId。
+
+`tabs/observe`是只读操作；超时返回`browser_read_timeout`，`input_result_uncertain:false`，保留标签绑定。按照`recovery.next_call`只重试一次；同一读取连续两次失败后不再给重试调用。此规则不允许重放结果未知的click/fill等操作。`browser_extension_unavailable`仅说明没有扩展连接，不能直接断言Edge已关闭；错误会引导先检查窗口。
+
+有多个启动入口时，可在目标机器运行安装脚本并加`--preferred-shortcut-name "用户选定的桌面快捷方式名称"`。这仅保存ShareMouse自己的`browser/startup.json`提示，不自动执行启动器、不修改Edge配置。没有扩展连接时，目标电脑会把该名称返回给agent，要求从刚观察的控件中匹配；不会因另一台机器/旧聊天没有上下文而默认选择普通Edge。未传此选项时保留已有提示；删除该文件即可清除提示。
+
+独立控件模式会保留`text_only`设置；会话刷新后若`input_attempted:false`，返回`review_new_controls`及新的控件树，按提示核对后使用新引用即可，不必寻找该模式不提供的截图。错误码与错误正文分开传递；`tabs.guidance`与错误`recovery`提供运行时指引，以便旧客户端缓存的工具描述仍能得到当前恢复说明。
+
+每次都传相同`window_id`也会沿用绑定，不会重开会话拦住点击；更换ID仍重新绑定。语义动作只支持当前控件声明的动作，`element_id`配`double_click`等不支持的组合会在接管前拒绝。
+
+`navigate`仅发送一次导航，随后最多检查2.5秒，返回`navigation_state:complete/pending/error`及标签状态；pending时等候观察，不再发送同一导航。`browser_page_loading`仅允许一次有界只读重试；真正的错误页返回`browser_page_error`。歧义、旧引用、禁用等明确发生在输入前的拒绝返回`input_outcome:not_attempted`，按`recovery`重新观察并选择新`element_id`；填值后校验失败、焦点/事件分发后异常或超时仍保留unknown，不据“失败”擅自重放。
+
+扩展仅按需在明确标签页的HTTP(S)页面注入隔离脚本，Native Messaging凭据留在本机Python宿主，不发给网页。远端命令仍沿ShareMouse已认证的连接。`tabs`/`observe`与动作均使用现有控制租约和用户退出保护，默认30秒空闲释放；浏览器不可用时不退回鼠标。多个浏览器配置同时连接扩展时返回 `browser_profile_ambiguous`，请只启用目标配置的此扩展。
+
+这是一套轻量DOM驱动，不是完整Playwright或浏览器原生无障碍树。支持open shadow root和同源iframe；跨源iframe、closed shadow root、浏览器设置/地址栏、Canvas内容暂不支持。页面事件 `isTrusted=false`，网站若依赖可信输入/复杂编辑器可能不接受；不提供任意JavaScript/eval或自动绕过网站限制。密码值在树中隐藏，页面文本始终视为不可信数据。
+
+原生 `browser_command` 是高级接口，需要 `peer_id`、`control_session_id`、UUID `request_id` 和白名单 `command`。私有JSON-RPC `browser/exchange` 仅供已认证本机宿主轮询，不列为MCP工具。宿主250ms心跳、5秒失联判断，单命令15秒截止；命令64KiB、回包220KiB内。请求在当前租约内去重：保留64个结果、最多4096个已见ID，已淘汰结果的旧ID拒绝重执行。未知/超时结果不能盲目重试；明确用户退出须重新获得用户授权。
+
+实现依据：[Microsoft Edge Native Messaging](https://learn.microsoft.com/en-us/microsoft-edge/extensions/developer-guide/native-messaging)、[Chrome isolated content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)。
+
+## 窗口绑定与无鼠标操作（MCP 1.4.0 / 2026-11-11）
+
+推荐先枚举窗口，再绑定具体窗口；后续使用最新返回的 `controls` 中的 `element_id`，无需管理会话或观察 ID。
+
+```json
+{"computer":"local","action":"windows"}
+{"action":"observe","window_id":"从 windows 返回的 ID","control_mode":"independent","text_only":true}
+{"action":"click","element_id":"最新 controls 中的按钮 ID","text_only":true}
+{"action":"set_value","element_id":"最新 controls 中的输入框 ID","text":"替换整个字段","text_only":true}
+{"action":"release"}
+```
+
+`set_value` 替换整个字段，空字符串用于清空；`type` 保留原有输入语义。控件的 `actions` 表示原生可用动作。准确且唯一的 `target` 名称也可以使用；重名时返回候选控件，按 ID 选择。每次动作返回新状态；旧 ID 不在最新观察中时只返回新观察，不执行输入。应用有多个窗口时要求使用 `window_id`，目标关闭后不会自动选择另一个窗口。枚举窗口不激活应用、不获取控制租约。
+
+- **macOS**：调用 AXPress／AXValue；可返回独立窗口截图，也可用 `text_only` 仅获取控件树。绑定范围和控件归属在执行前重新检查。
+- **Windows**：调用 UI Automation 的 Invoke／Toggle／SelectionItem／Value pattern，不使用 SendInput、SetCursorPos 或 SetFocus。独立模式返回绑定窗口的控件树，当前不提供窗口截图、坐标点击、通用键盘输入或拖拽；不支持时直接报错。**提供者可能自行激活窗口**：WPF 按钮实测 Invoke 会切换前台，但系统鼠标位置保持。不能承诺完全不打断用户键盘焦点。
+- 未绑定窗口的 `text_only` 观察仍是无租约只读操作；绑定后的观察和动作使用正常租约，保留占用、明确退出、超时及断线释放规则。独立模式不会自动回退到用户鼠标。
+
+与 computer use MCP 的 app/window 绑定、控件索引和 `setValue` 对齐的是操作流程；这里使用观察中返回的控件 ID，继续保留现有 `computer_use` 单入口及远端加密链路。自绘游戏、画布及未提供无障碍信息的应用仍需明确选择 `user_mouse`。
+
 ## 接入
 
 1. 启动两端 ShareMouse，按现有配对流程建立连接。
@@ -41,7 +101,7 @@ ShareMouse 是本机安装的自定义 MCP 服务，不通过插件市场分发�
 | `needs_review:true` | 先查看返回的新图，再按新图定位；本次坐标输入可能尚未执行 |
 | `application_focus_denied` | 显式应用绑定的激活步骤失败。需要桌面操作时先用 `user_mouse` 且不传 application 重新观察，后续点击也不传 application |
 
-`codex mcp get ShareMouse --json` 可以核对 Codex 保存的启动配置，但列出配置不等于连接成功。应以新连接能列出六个默认工具、取得目标电脑画面，并观察到实际输入结果为准。DeepSeek Harness 的 stdio 条目同样必须引用现有脚本。修正配置后，已经打开的客户端可能仍需在 MCP 设置中刷新连接；不要为此终止其它 agent 的活跃接管。
+`codex mcp get ShareMouse --json` 可以核对 Codex 保存的启动配置，但列出配置不等于连接成功。应以新连接能列出七个默认工具、取得目标电脑画面，并观察到实际输入结果为准。DeepSeek Harness 的 stdio 条目同样必须引用现有脚本。修正配置后，已经打开的客户端可能仍需在 MCP 设置中刷新连接；不要为此终止其它 agent 的活跃接管。
 
 Codex 的 stdio `command` / `args` 配置字段见 [OpenAI 官方说明](https://learn.chatgpt.com/docs/extend/mcp#stdio-servers)。
 
@@ -50,7 +110,7 @@ Codex 的 stdio `command` / `args` 配置字段见 [OpenAI 官方说明](https:/
 
 ## 推荐：轻量 Computer Use
 
-stdio 接入默认提供 6 个工具：`computer_use`、`list_computers` 和 4 个文件工具。电脑操作集中在 `computer_use`，会话 token／观察帧编号由客户端保存，截图作为 image content 返回，structuredContent 仅含状态。已有客户端需刷新 MCP 连接后加载新目录。
+stdio 接入默认提供 7 个工具：`browser_use`、`computer_use`、`list_computers` 和 4 个文件工具。电脑操作集中在 `computer_use`，会话 token／观察帧编号由客户端保存，截图作为 image content 返回，structuredContent 仅含状态。已有客户端需刷新 MCP 连接后加载新目录。
 
 以下坐标和文字仅演示参数，点击位置必须按本轮返回的画面替换。先使用不绑定应用的桌面模式：
 
